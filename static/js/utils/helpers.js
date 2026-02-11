@@ -54,7 +54,8 @@ export function formatFileSize(bytes) {
  * @returns {object} 验证结果 {valid: boolean, message: string}
  */
 export function validateFile(file) {
-    const { ALLOWED_EXTENSIONS, MAX_FILE_SIZE } = require('./constants');
+    const ALLOWED_EXTENSIONS = ['.xlsx', '.xls'];
+    const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
 
     const extension = '.' + file.name.split('.').pop().toLowerCase();
 
