@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="专业Excel数据处理工具 - 智能表头映射与数据提取">
+    <title>数据处理工具 | Excel智能整理</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 顶部导航栏 -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <i class="fas fa-file-excel logo-icon"></i>
+                    <div class="logo-text">
+                        <h1 class="app-name">数据处理工具</h1>
+                        <p class="app-tagline">智能Excel整理解决方案</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <main class="main-content">
+            <div class="content-wrapper">
+                <!-- 步骤指示器 -->
+                <div class="steps-indicator">
+                    <div class="step-item active" data-step="1">
+                        <div class="step-number">
+                            <i class="fas fa-upload"></i>
+                        </div>
+                        <div class="step-label">上传文件</div>
+                    </div>
+                    <div class="step-item" data-step="2">
+                        <div class="step-number">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <div class="step-label">设置映射</div>
+                    </div>
+                    <div class="step-item" data-step="3">
+                        <div class="step-number">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <div class="step-label">分析数据</div>
+                    </div>
+                    <div class="step-item" data-step="4">
+                        <div class="step-number">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="step-label">查看结果</div>
+                    </div>
+                </div>
+
+                <!-- 步骤内容区域 -->
+                <div class="steps-container">
+                    <!-- 第一步：上传文件 -->
+                    <div class="step-content active" id="step-1">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-upload"></i> 上传Excel文件</h2>
+                                <p>支持 .xlsx 和 .xls 格式，自动识别多个Sheet</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="upload-zone" id="uploadZone">
+                                    <div class="upload-icon">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                    </div>
+                                    <h3>拖拽文件到此处</h3>
+                                    <p>或点击选择文件上传</p>
+                                    <p class="upload-hint">支持 .xlsx 和 .xls 格式，最大 16MB</p>
+                                    <input type="file" id="fileInput" accept=".xlsx,.xls" hidden>
+                                    <button class="btn btn-primary" onclick="document.getElementById('fileInput').click()">
+                                        <i class="fas fa-folder-open"></i> 选择文件
+                                    </button>
+                                </div>
+                                <div class="file-preview" id="filePreview" style="display: none;">
+                                    <div class="file-info">
+                                        <i class="fas fa-file-excel"></i>
+                                        <div class="file-details">
+                                            <span class="file-name" id="fileName"></span>
+                                            <span class="file-sheets" id="fileSheets"></span>
+                                        </div>
+                                        <button class="btn btn-secondary" onclick="resetUpload()">
+                                            <i class="fas fa-times"></i> 重新选择
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 第二步：设置映射 -->
+                    <div class="step-content" id="step-2">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-cogs"></i> 设置表头映射</h2>
+                                <p>为每个Sheet设置表头所在行和映射关系</p>
+                            </div>
+                            <div class="card-body">
+                                <div id="mappingContainer" class="mapping-container"></div>
+                                <div class="action-buttons">
+                                    <button class="btn btn-secondary" onclick="goToStep(1)">
+                                        <i class="fas fa-arrow-left"></i> 上一步
+                                    </button>
+                                    <button class="btn btn-primary" onclick="analyzeData()">
+                                        <i class="fas fa-play"></i> 开始分析
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 第三步：分析中 -->
+                    <div class="step-content" id="step-3">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-chart-bar"></i> 正在分析数据</h2>
+                                <p>请稍候，正在处理您的数据...</p>
+                            </div>
+                            <div class="card-body">
+                                <div class="loading-animation">
+                                    <div class="spinner"></div>
+                                    <p>数据处理中</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 第四步：查看结果 -->
+                    <div class="step-content" id="step-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-check-circle"></i> 分析完成</h2>
+                                <p>数据提取完成，您可以查看结果或导出Excel文件</p>
+                            </div>
+                            <div class="card-header-actions">
+                                <button class="btn btn-secondary" onclick="resetApp()">
+                                    <i class="fas fa-redo"></i> 重新开始
+                                </button>
+                                <button class="btn btn-success" onclick="exportData()">
+                                    <i class="fas fa-download"></i> 导出Excel
+                                </button>
+                            </div>
+                            <div class="card-body">
+                                <div id="resultsContainer" class="results-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 底部信息 -->
+        <footer class="app-footer">
+            <p>&copy; 2026 数据处理工具 | 专业Excel数据整理解决方案</p>
+        </footer>
+    </div>
+
+    <!-- Toast提示 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
