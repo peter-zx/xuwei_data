@@ -36,6 +36,11 @@
             <div class="step-line"></div>
             <div class="step" data-step="5">
                 <div class="step-circle">5</div>
+                <div class="step-label">数据比对</div>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="6">
+                <div class="step-circle">6</div>
                 <div class="step-label">查看结果</div>
             </div>
         </div>
@@ -111,19 +116,45 @@
                 </div>
             </div>
 
-            <!-- Step 5: Results -->
+            <!-- Step 5: Comparison -->
             <div class="step-content" id="step5">
+                <div class="comparison-container">
+                    <div class="results-header">
+                        <h2>数据比对</h2>
+                        <div class="button-group">
+                            <button class="btn btn-secondary" id="backToAnalyzeBtn">返回数据映射</button>
+                            <button class="btn btn-primary" id="toResultsBtn">查看结果</button>
+                        </div>
+                    </div>
+                    <div class="comparison-controls">
+                        <div class="filter-buttons">
+                            <button class="filter-btn active" data-filter="all">全部</button>
+                            <button class="filter-btn" data-filter="matched">相同人</button>
+                            <button class="filter-btn" data-filter="unmatched">非相同人</button>
+                        </div>
+                        <div class="export-buttons">
+                            <button class="btn btn-success" id="exportBtn">导出表格</button>
+                        </div>
+                    </div>
+                    <div class="comparison-summary" id="comparisonSummary"></div>
+                    <div class="comparison-tabs" id="comparisonTabs"></div>
+                    <div class="comparison-content" id="comparisonContent"></div>
+                </div>
+            </div>
+
+            <!-- Step 6: Results -->
+            <div class="step-content" id="step6">
                 <div class="results-container">
                     <div class="results-header">
-                        <h2>映射结果</h2>
+                        <h2>比对结果</h2>
                         <div class="button-group">
-                            <button class="btn btn-secondary" id="backToMappingBtn">重新配置映射</button>
+                            <button class="btn btn-secondary" id="backToComparisonBtn">返回数据比对</button>
                             <button class="btn btn-primary" id="resetBtn">处理新文件</button>
                         </div>
                     </div>
-                    <div class="summary-stats" id="summaryStats"></div>
-                    <div class="results-tabs" id="resultsTabs"></div>
-                    <div class="results-content" id="resultsContent"></div>
+                    <div class="summary-stats" id="finalStats"></div>
+                    <div class="results-tabs" id="finalTabs"></div>
+                    <div class="results-content" id="finalContent"></div>
                 </div>
             </div>
         </div>

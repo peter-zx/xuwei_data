@@ -30,7 +30,7 @@ def clean_column_name(col_name):
 
 def get_standard_fields():
     """返回标准字段列表（可配置）"""
-    return ['姓名', '电话', '身份证', '残疾证', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型']
+    return ['姓名', '电话', '身份证', '残疾证', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型', '残疾证号']
 
 
 def get_cache_path(filename):
@@ -175,25 +175,27 @@ def analyze_sheets():
                 header_row = sheet_mapping.get('header_row', 0)
                 field_mapping = sheet_mapping.get('fields', {})
 
+                # 确保field_mapping不为None
+                if field_mapping is None:
+                    field_mapping = {}
+
                 df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
 
                 extracted_data = []
                 for idx, row in df.iterrows():
                     record = {}
-                    has_data = False
 
                     for field in get_standard_fields():
                         col_name = field_mapping.get(field)
-                        if col_name and col_name in df.columns:
+                        if col_name and col_name.strip() and col_name in df.columns:
                             value = str(row[col_name]) if pd.notna(row[col_name]) else ''
                             record[field] = value
-                            if value:
-                                has_data = True
                         else:
+                            # 未映射的字段或列不存在，留空
                             record[field] = ''
 
-                    if has_data:
-                        extracted_data.append(record)
+                    # 保留所有原始数据行
+                    extracted_data.append(record)
 
                 sheet_result['mapping'] = field_mapping
                 sheet_result['data'] = extracted_data
