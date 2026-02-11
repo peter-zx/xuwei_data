@@ -597,6 +597,32 @@ select:focus {
     margin: 0;
 }
 
+/* Data View Container */
+.data-view-container {
+    padding: 20px 0;
+}
+
+.mapping-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.data-view-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    overflow-x: auto;
+}
+
+.data-view-content {
+    overflow-x: auto;
+}
+
 /* Comparison Controls */
 .comparison-controls {
     display: flex;

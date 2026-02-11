@@ -396,8 +396,7 @@ document.getElementById('toAnalyzeBtn').addEventListener('click', async () => {
         if (data.success) {
             window.analysisResults = data.results;
             mappedResults = data.results;
-            performDataComparison();
-            updateStep(5);
+            renderMappedDataView(); // 显示映射后的原始数据
             showToast('数据映射完成');
         } else {
             console.error('映射失败:', data.error);
@@ -413,7 +412,90 @@ document.getElementById('toAnalyzeBtn').addEventListener('click', async () => {
 
 
 
-// 重新配置映射
+// 渲染映射数据视图（环节4）
+function renderMappedDataView() {
+    if (!mappedResults) return;
+
+    const totalSheets = mappedResults.length;
+    const totalRecords = mappedResults.reduce((sum, r) => sum + (r.record_count || 0), 0);
+    const successCount = mappedResults.filter(r => r.success).length;
+
+    document.getElementById('mappingSummary').innerHTML = `
+        <div class="stat-card">
+            <h3>总Sheet数</h3>
+            <div class="value">${totalSheets}</div>
+        </div>
+        <div class="stat-card">
+            <h3>总记录数</h3>
+            <div class="value">${totalRecords}</div>
+        </div>
+        <div class="stat-card">
+            <h3>成功处理</h3>
+            <div class="value">${successCount}</div>
+        </div>
+    `;
+
+    document.getElementById('dataViewTabs').innerHTML = mappedResults.map((result, index) => `
+        <button class="tab-btn ${index === 0 ? 'active' : ''}" data-index="${index}">
+            ${result.name} (${result.record_count || 0}条)
+        </button>
+    `).join('');
+
+    document.querySelectorAll('#dataViewTabs .tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            document.querySelectorAll('#dataViewTabs .tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            showMappedDataPanel(parseInt(e.target.dataset.index));
+        });
+    });
+
+    showMappedDataPanel(0);
+}
+
+function showMappedDataPanel(index) {
+    const result = mappedResults[index];
+    if (!result) {
+        document.getElementById('dataViewContent').innerHTML = '<p>暂无数据</p>';
+        return;
+    }
+
+    const { mapping, data, success, error } = result;
+
+    let html = '';
+
+    if (!success) {
+        html = `<div class="error-message">处理失败: ${error}</div>`;
+    } else if (data.length === 0) {
+        html = '<div class="no-data-message">没有提取到数据，请检查映射配置</div>';
+    } else {
+        html += `
+            <div class="mapping-info">
+                <h4>映射关系</h4>
+                ${Object.entries(mapping).map(([field, col]) => `
+                    <span class="mapping-item">${field} ← ${col}</span>
+                `).join('')}
+            </div>
+            <table class="result-table">
+                <thead>
+                    <tr>
+                        ${getStandardFields().map(field => `<th>${field}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(row => `
+                        <tr>
+                            ${getStandardFields().map(field => `<td>${row[field] || ''}</td>`).join('')}
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    document.getElementById('dataViewContent').innerHTML = html;
+}
+
+// 环节4: 返回配置映射
 const backToMappingBtn = document.getElementById('backToMappingBtn');
 if (backToMappingBtn) {
     backToMappingBtn.addEventListener('click', () => {
@@ -421,10 +503,21 @@ if (backToMappingBtn) {
     });
 }
 
-// 数据比对 - 返回映射
-const backToAnalyzeBtn = document.getElementById('backToAnalyzeBtn');
-if (backToAnalyzeBtn) {
-    backToAnalyzeBtn.addEventListener('click', () => {
+// 环节4: 进入数据比对
+const toComparisonBtn = document.getElementById('toComparisonBtn');
+if (toComparisonBtn) {
+    toComparisonBtn.addEventListener('click', () => {
+        performDataComparison();
+        updateStep(5);
+    });
+}
+
+// 重新配置映射
+
+// 数据比对 - 返回数据视图
+const backToDataViewBtn = document.getElementById('backToDataViewBtn');
+if (backToDataViewBtn) {
+    backToDataViewBtn.addEventListener('click', () => {
         updateStep(4);
     });
 }
