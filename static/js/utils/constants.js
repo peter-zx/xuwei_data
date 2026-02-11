@@ -10,9 +10,10 @@ export const APP_CONFIG = {
 
 export const STEP_CONFIG = {
     UPLOAD: 1,
-    MAPPING: 2,
-    ANALYZING: 3,
-    RESULT: 4
+    PREVIEW: 2,
+    MAPPING: 3,
+    ANALYZING: 4,
+    RESULT: 5
 };
 
 export const STANDARD_HEADERS = [

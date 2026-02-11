@@ -5,6 +5,7 @@
 
 import { StepIndicator } from './components/StepIndicator.js';
 import { FileUploader } from './components/FileUploader.js';
+import { SheetPreview } from './components/SheetPreview.js';
 import { MappingEditor } from './components/MappingEditor.js';
 import { ResultsViewer } from './components/ResultsViewer.js';
 import { analyzeData as analyzeDataAPI } from './services/api.js';
@@ -17,12 +18,14 @@ class Application {
             currentStep: STEP_CONFIG.UPLOAD,
             filepath: '',
             sheetInfo: {},
+            headerRows: {},
             sheetResults: {}
         };
 
         this.components = {
             stepIndicator: new StepIndicator(),
             fileUploader: null,
+            sheetPreview: new SheetPreview(this.handlePreviewConfirm.bind(this)),
             mappingEditor: new MappingEditor(),
             resultsViewer: new ResultsViewer()
         };
@@ -46,10 +49,23 @@ class Application {
         this.state.filepath = result.filepath;
         this.state.sheetInfo = result.sheet_info;
 
-        // 显示映射设置
-        this.components.mappingEditor.render(result.sheet_info);
+        // 显示Sheet预览
+        this.components.sheetPreview.render(result.sheet_info);
 
-        // 跳转到第二步
+        // 跳转到预览步骤
+        this.goToStep(STEP_CONFIG.PREVIEW);
+    }
+
+    /**
+     * 处理预览确认
+     */
+    handlePreviewConfirm(headerRows) {
+        this.state.headerRows = headerRows;
+
+        // 显示映射设置，传入标题行配置
+        this.components.mappingEditor.render(this.state.sheetInfo, headerRows);
+
+        // 跳转到映射步骤
         this.goToStep(STEP_CONFIG.MAPPING);
     }
 
@@ -100,10 +116,12 @@ class Application {
             currentStep: STEP_CONFIG.UPLOAD,
             filepath: '',
             sheetInfo: {},
+            headerRows: {},
             sheetResults: {}
         };
 
         this.components.fileUploader.reset();
+        this.components.sheetPreview.reset();
         this.components.mappingEditor.reset();
         this.components.resultsViewer.reset();
         this.components.stepIndicator.reset();
@@ -130,6 +148,7 @@ class Application {
 const app = new Application();
 
 // 导出全局函数供HTML调用
+window.confirmPreview = () => app.components.sheetPreview.confirm();
 window.analyzeData = () => app.handleAnalyze();
 window.exportData = () => app.handleExport();
 window.resetApp = () => app.handleReset();

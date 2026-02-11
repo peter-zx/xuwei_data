@@ -13,9 +13,11 @@ export class MappingEditor {
     /**
      * 渲染映射编辑器
      * @param {object} sheetInfo - Sheet信息
+     * @param {object} headerRows - 标题行配置
      */
-    render(sheetInfo) {
+    render(sheetInfo, headerRows = {}) {
         this.sheetInfo = sheetInfo;
+        this.headerRows = headerRows;
         const container = document.getElementById('mappingContainer');
         if (!container) return;
 
@@ -29,7 +31,7 @@ export class MappingEditor {
         }
 
         sheetNames.forEach(sheetName => {
-            const card = this.createSheetCard(sheetName, sheetInfo[sheetName]);
+            const card = this.createSheetCard(sheetName, sheetInfo[sheetName], headerRows[sheetName] || 1);
             container.appendChild(card);
         });
     }
@@ -37,7 +39,7 @@ export class MappingEditor {
     /**
      * 创建Sheet卡片
      */
-    createSheetCard(sheetName, sheetData) {
+    createSheetCard(sheetName, sheetData, headerRow = 1) {
         const card = document.createElement('div');
         card.className = 'sheet-mapping-card';
 
@@ -55,8 +57,8 @@ export class MappingEditor {
             <div class="sheet-card-body">
                 <div class="row-setting">
                     <label>表头所在行:</label>
-                    <input type="number" min="1" max="10" value="1" id="header-row-${sheetName}">
-                    <span style="color: var(--text-muted); font-size: 0.875rem;">默认第1行</span>
+                    <input type="number" min="1" max="10" value="${headerRow}" id="header-row-${sheetName}">
+                    <span style="color: var(--text-muted); font-size: 0.875rem;">当前设置: 第${headerRow}行</span>
                 </div>
 
                 <div class="headers-info">

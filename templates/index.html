@@ -36,17 +36,23 @@
                     </div>
                     <div class="step-item" data-step="2">
                         <div class="step-number">
+                            <i class="fas fa-eye"></i>
+                        </div>
+                        <div class="step-label">预览数据</div>
+                    </div>
+                    <div class="step-item" data-step="3">
+                        <div class="step-number">
                             <i class="fas fa-cogs"></i>
                         </div>
                         <div class="step-label">设置映射</div>
                     </div>
-                    <div class="step-item" data-step="3">
+                    <div class="step-item" data-step="4">
                         <div class="step-number">
                             <i class="fas fa-chart-bar"></i>
                         </div>
                         <div class="step-label">分析数据</div>
                     </div>
-                    <div class="step-item" data-step="4">
+                    <div class="step-item" data-step="5">
                         <div class="step-number">
                             <i class="fas fa-check-circle"></i>
                         </div>
@@ -92,8 +98,29 @@
                         </div>
                     </div>
 
-                    <!-- 第二步：设置映射 -->
+                    <!-- 第二步：预览数据 -->
                     <div class="step-content" id="step-2">
+                        <div class="card">
+                            <div class="card-header">
+                                <h2><i class="fas fa-eye"></i> 预览Sheet数据</h2>
+                                <p>查看每个Sheet的前5行数据，并设置标题所在行</p>
+                            </div>
+                            <div class="card-body">
+                                <div id="previewContainer" class="preview-container"></div>
+                                <div class="action-buttons">
+                                    <button class="btn btn-secondary" onclick="goToStep(1)">
+                                        <i class="fas fa-arrow-left"></i> 上一步
+                                    </button>
+                                    <button class="btn btn-primary" onclick="confirmPreview()">
+                                        <i class="fas fa-check"></i> 确认标题行
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 第三步：设置映射 -->
+                    <div class="step-content" id="step-3">
                         <div class="card">
                             <div class="card-header">
                                 <h2><i class="fas fa-cogs"></i> 设置表头映射</h2>
@@ -102,7 +129,7 @@
                             <div class="card-body">
                                 <div id="mappingContainer" class="mapping-container"></div>
                                 <div class="action-buttons">
-                                    <button class="btn btn-secondary" onclick="goToStep(1)">
+                                    <button class="btn btn-secondary" onclick="goToStep(2)">
                                         <i class="fas fa-arrow-left"></i> 上一步
                                     </button>
                                     <button class="btn btn-primary" onclick="analyzeData()">
@@ -113,8 +140,8 @@
                         </div>
                     </div>
 
-                    <!-- 第三步：分析中 -->
-                    <div class="step-content" id="step-3">
+                    <!-- 第四步：分析中 -->
+                    <div class="step-content" id="step-4">
                         <div class="card">
                             <div class="card-header">
                                 <h2><i class="fas fa-chart-bar"></i> 正在分析数据</h2>
@@ -129,8 +156,8 @@
                         </div>
                     </div>
 
-                    <!-- 第四步：查看结果 -->
-                    <div class="step-content" id="step-4">
+                    <!-- 第五步：查看结果 -->
+                    <div class="step-content" id="step-5">
                         <div class="card">
                             <div class="card-header">
                                 <h2><i class="fas fa-check-circle"></i> 分析完成</h2>
