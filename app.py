@@ -1,16 +1,22 @@
 from flask import Flask, request, jsonify, render_template
 import pandas as pd
 import os
+import shutil
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timedelta
+import threading
+import time
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['CACHE_FOLDER'] = 'cache'
 app.config['ALLOWED_EXTENSIONS'] = {'xlsx', 'xls'}
+app.config['CACHE_DAYS'] = 7  # 缓存保留天数
 
-# 确保上传目录存在
+# 确保目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+os.makedirs(app.config['CACHE_FOLDER'], exist_ok=True)
 
 
 def allowed_file(filename):
@@ -25,6 +31,64 @@ def clean_column_name(col_name):
 def get_standard_fields():
     """返回标准字段列表（可配置）"""
     return ['姓名', '电话', '身份证', '残疾证', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型']
+
+
+def get_cache_path(filename):
+    """生成缓存文件路径"""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    cache_name = f"{timestamp}_{filename}"
+    return os.path.join(app.config['CACHE_FOLDER'], cache_name)
+
+
+def copy_to_cache(original_path):
+    """复制文件到缓存目录，去除公式"""
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    original_name = os.path.basename(original_path)
+    cache_name = f"{timestamp}_{original_name}"
+    cache_path = os.path.join(app.config['CACHE_FOLDER'], cache_name)
+
+    try:
+        # 读取Excel文件，pandas会自动计算公式值
+        excel_data = pd.ExcelFile(original_path)
+
+        with pd.ExcelWriter(cache_path, engine='openpyxl') as writer:
+            for sheet_name in excel_data.sheet_names:
+                # 读取数据，公式会被计算为实际值
+                df = pd.read_excel(original_path, sheet_name=sheet_name)
+                df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+        return cache_name
+    except Exception as e:
+        raise Exception(f'缓存文件创建失败: {str(e)}')
+
+
+def cleanup_old_cache():
+    """清理过期的缓存文件"""
+    try:
+        now = datetime.now()
+        cutoff = now - timedelta(days=app.config['CACHE_DAYS'])
+
+        for filename in os.listdir(app.config['CACHE_FOLDER']):
+            filepath = os.path.join(app.config['CACHE_FOLDER'], filename)
+            if os.path.isfile(filepath):
+                file_time = datetime.fromtimestamp(os.path.getmtime(filepath))
+                if file_time < cutoff:
+                    os.remove(filepath)
+                    print(f'清理过期缓存: {filename}')
+    except Exception as e:
+        print(f'清理缓存失败: {str(e)}')
+
+
+def start_cleanup_scheduler():
+    """启动定时清理任务"""
+    def cleanup_task():
+        while True:
+            time.sleep(3600)  # 每小时检查一次
+            cleanup_old_cache()
+
+    cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
+    cleanup_thread.start()
+    print('缓存清理任务已启动')
 
 
 @app.route('/')
@@ -45,19 +109,22 @@ def upload_file():
         if not allowed_file(file.filename):
             return jsonify({'error': '只支持 .xlsx 和 .xls 文件格式'}), 400
 
-        # 保存文件
+        # 保存原始文件
         filename = secure_filename(file.filename)
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{filename}"
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
+        original_filename = f"{timestamp}_{filename}"
+        original_filepath = os.path.join(app.config['UPLOAD_FOLDER'], original_filename)
+        file.save(original_filepath)
 
-        # 读取Excel文件信息
-        excel_data = pd.ExcelFile(filepath)
+        # 创建缓存文件（去除公式）
+        cache_filename = copy_to_cache(original_filepath)
+
+        # 读取缓存文件信息
+        excel_data = pd.ExcelFile(os.path.join(app.config['CACHE_FOLDER'], cache_filename))
         sheets_info = []
 
         for sheet_name in excel_data.sheet_names:
-            df = pd.read_excel(filepath, sheet_name=sheet_name)
+            df = pd.read_excel(os.path.join(app.config['CACHE_FOLDER'], cache_filename), sheet_name=sheet_name)
             sheets_info.append({
                 'name': sheet_name,
                 'rows': len(df),
@@ -66,7 +133,8 @@ def upload_file():
 
         return jsonify({
             'success': True,
-            'filename': filename,
+            'filename': cache_filename,
+            'original_filename': original_filename,
             'sheets': sheets_info,
             'sheet_count': len(sheets_info)
         })
@@ -85,7 +153,8 @@ def analyze_sheets():
         if not filename:
             return jsonify({'error': '未提供文件名'}), 400
 
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # 使用缓存文件
+        filepath = os.path.join(app.config['CACHE_FOLDER'], filename)
         if not os.path.exists(filepath):
             return jsonify({'error': '文件不存在'}), 404
 
@@ -102,15 +171,12 @@ def analyze_sheets():
             }
 
             try:
-                # 获取该Sheet的映射配置
                 sheet_mapping = mappings.get(sheet_name, {})
                 header_row = sheet_mapping.get('header_row', 0)
                 field_mapping = sheet_mapping.get('fields', {})
 
-                # 读取数据
                 df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
 
-                # 提取数据
                 extracted_data = []
                 for idx, row in df.iterrows():
                     record = {}
@@ -126,7 +192,7 @@ def analyze_sheets():
                         else:
                             record[field] = ''
 
-                    if has_data:  # 只保存有数据的记录
+                    if has_data:
                         extracted_data.append(record)
 
                 sheet_result['mapping'] = field_mapping
@@ -145,7 +211,7 @@ def analyze_sheets():
         })
 
     except Exception as e:
-        return jsonify({'error': f'分析失败: {str(e)}'}), 500
+        return jsonify({'error': f'映射失败: {str(e)}'}), 500
 
 
 @app.route('/api/sheet-preview', methods=['POST'])
@@ -155,20 +221,19 @@ def sheet_preview():
         data = request.json
         filename = data.get('filename')
         sheet_name = data.get('sheet_name')
-        header_row = data.get('header_row', 0)
         max_rows = data.get('max_rows', 5)
 
         if not filename or not sheet_name:
             return jsonify({'error': '缺少必要参数'}), 400
 
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # 使用缓存文件
+        filepath = os.path.join(app.config['CACHE_FOLDER'], filename)
         if not os.path.exists(filepath):
             return jsonify({'error': '文件不存在'}), 404
 
-        # 读取前N行数据（不设置header，获取原始数据）
+        # 读取前N行原始数据
         df = pd.read_excel(filepath, sheet_name=sheet_name, header=None, nrows=max_rows)
 
-        # 转换为列表格式
         preview_data = []
         for idx, row in df.iterrows():
             row_data = [clean_column_name(cell) if pd.notna(cell) else '' for cell in row]
@@ -196,14 +261,13 @@ def get_columns():
         if not filename or not sheet_name:
             return jsonify({'error': '缺少必要参数'}), 400
 
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        # 使用缓存文件
+        filepath = os.path.join(app.config['CACHE_FOLDER'], filename)
         if not os.path.exists(filepath):
             return jsonify({'error': '文件不存在'}), 404
 
-        # 读取Excel，设置指定的header_row
         df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
 
-        # 清理并过滤列名
         columns = [clean_column_name(col) for col in df.columns if not str(col).startswith('Unnamed')]
 
         return jsonify({
@@ -216,4 +280,7 @@ def get_columns():
 
 
 if __name__ == '__main__':
+    # 启动缓存清理任务
+    start_cleanup_scheduler()
+
     app.run(debug=True, host='0.0.0.0', port=8080)

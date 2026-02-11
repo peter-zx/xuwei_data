@@ -13,6 +13,10 @@ ENV/
 uploads/*
 !uploads/.gitkeep
 
+# 缓存文件
+cache/*
+!cache/.gitkeep
+
 # IDE
 .vscode/
 .idea/

@@ -31,7 +31,7 @@
             <div class="step-line"></div>
             <div class="step" data-step="4">
                 <div class="step-circle">4</div>
-                <div class="step-label">数据分析</div>
+                <div class="step-label">数据映射</div>
             </div>
             <div class="step-line"></div>
             <div class="step" data-step="5">
@@ -103,7 +103,7 @@
             <!-- Step 4: Analyze -->
             <div class="step-content" id="step4">
                 <div class="analyze-container">
-                    <h2>数据分析中...</h2>
+                    <h2>数据映射中...</h2>
                     <div class="loading-spinner">
                         <div class="spinner"></div>
                         <p>正在处理数据，请稍候...</p>
@@ -114,14 +114,16 @@
             <!-- Step 5: Results -->
             <div class="step-content" id="step5">
                 <div class="results-container">
-                    <h2>分析结果</h2>
+                    <div class="results-header">
+                        <h2>映射结果</h2>
+                        <div class="button-group">
+                            <button class="btn btn-secondary" id="backToMappingBtn">重新配置映射</button>
+                            <button class="btn btn-primary" id="resetBtn">处理新文件</button>
+                        </div>
+                    </div>
                     <div class="summary-stats" id="summaryStats"></div>
                     <div class="results-tabs" id="resultsTabs"></div>
                     <div class="results-content" id="resultsContent"></div>
-                </div>
-                <div class="button-group">
-                    <button class="btn btn-secondary" id="backToMappingBtn">重新配置映射</button>
-                    <button class="btn btn-primary" id="resetBtn">处理新文件</button>
                 </div>
             </div>
         </div>

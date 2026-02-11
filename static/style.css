@@ -585,6 +585,18 @@ select:focus {
     color: var(--text-secondary);
 }
 
+/* Results Header */
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.results-header h2 {
+    margin: 0;
+}
+
 /* Toast */
 .toast {
     position: fixed;

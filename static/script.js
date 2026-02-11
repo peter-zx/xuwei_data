@@ -415,6 +415,9 @@ function renderResults(results) {
         </div>
     `;
 
+    // 更新页面标题
+    document.querySelector('.results-header h2').textContent = '映射结果';
+
     document.getElementById('resultsTabs').innerHTML = results.map((result, index) => `
         <button class="tab-btn ${index === 0 ? 'active' : ''}" data-index="${index}">
             ${result.name} (${result.record_count || 0}条)
