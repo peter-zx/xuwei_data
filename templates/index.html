@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel数据处理器</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Excel数据处理器</h1>
+            <p class="subtitle">智能处理Excel文件，支持多Sheet数据提取和表头映射</p>
+        </header>
+
+        <div class="progress-bar">
+            <div class="step active" data-step="1">
+                <div class="step-circle">1</div>
+                <div class="step-label">上传文件</div>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="2">
+                <div class="step-circle">2</div>
+                <div class="step-label">预览数据</div>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="3">
+                <div class="step-circle">3</div>
+                <div class="step-label">配置映射</div>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="4">
+                <div class="step-circle">4</div>
+                <div class="step-label">数据分析</div>
+            </div>
+            <div class="step-line"></div>
+            <div class="step" data-step="5">
+                <div class="step-circle">5</div>
+                <div class="step-label">查看结果</div>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Step 1: Upload -->
+            <div class="step-content active" id="step1">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <p class="upload-text">拖拽文件到此处或点击上传</p>
+                    <p class="upload-hint">支持 .xlsx 和 .xls 格式</p>
+                    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display: none;">
+                </div>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <div class="file-info-card">
+                        <div class="file-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="file-details">
+                            <h3 id="fileName">文件名.xlsx</h3>
+                            <p id="sheetCount">Sheet数量: 0</p>
+                        </div>
+                        <button class="btn btn-secondary" id="reuploadBtn">重新上传</button>
+                    </div>
+                    <div class="sheets-list" id="sheetsList"></div>
+                    <button class="btn btn-primary" id="toPreviewBtn">下一步: 预览数据</button>
+                </div>
+            </div>
+
+            <!-- Step 2: Preview -->
+            <div class="step-content" id="step2">
+                <div class="preview-container" id="previewContainer">
+                    <h2>数据预览</h2>
+                    <p class="hint">查看每个Sheet的前5行数据，设置表头所在行</p>
+                    <div id="previewSheets"></div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" id="backToUploadBtn">上一步</button>
+                    <button class="btn btn-primary" id="toMappingBtn">下一步: 配置映射</button>
+                </div>
+            </div>
+
+            <!-- Step 3: Mapping -->
+            <div class="step-content" id="step3">
+                <div class="mapping-container" id="mappingContainer">
+                    <h2>配置表头映射</h2>
+                    <p class="hint">为每个字段选择对应的Excel列名</p>
+                    <div id="mappingSheets"></div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" id="backToPreviewBtn">上一步</button>
+                    <button class="btn btn-primary" id="toAnalyzeBtn">下一步: 数据分析</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Analyze -->
+            <div class="step-content" id="step4">
+                <div class="analyze-container">
+                    <h2>数据分析中...</h2>
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                        <p>正在处理数据，请稍候...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: Results -->
+            <div class="step-content" id="step5">
+                <div class="results-container">
+                    <h2>分析结果</h2>
+                    <div class="summary-stats" id="summaryStats"></div>
+                    <div class="results-tabs" id="resultsTabs"></div>
+                    <div class="results-content" id="resultsContent"></div>
+                </div>
+                <div class="button-group">
+                    <button class="btn btn-secondary" id="backToMappingBtn">重新配置映射</button>
+                    <button class="btn btn-primary" id="resetBtn">处理新文件</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 配置
+        const CONFIG = {
+            maxPreviewRows: 5,
+            headerRowOptions: 10  // 允许选择前10行作为表头
+        };
+    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
