@@ -47,7 +47,7 @@ def clean_column_name(col_name):
 
 def get_standard_fields():
     """返回标准字段列表（可配置）"""
-    return ['姓名', '电话', '身份证', '残疾证', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型', '残疾证号']
+    return ['姓名', '电话', '身份证号', '残疾证号', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型']
 
 
 def get_cache_path(filename):
@@ -468,7 +468,7 @@ def compare_data():
         for sheet_name, records in sheets_data.items():
             for record in records:
                 name = record.get('姓名', '').strip()
-                id_card = record.get('身份证', '').strip()
+                id_card = record.get('身份证号', '').strip()
                 disability_card = record.get('残疾证号', '').strip()
                 
                 if not name:

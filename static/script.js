@@ -24,7 +24,7 @@ const toast = document.getElementById('toast');
 
 // 标准字段（可配置）
 function getStandardFields() {
-    return ['姓名', '电话', '身份证', '残疾证', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型', '残疾证号'];
+    return ['姓名', '电话', '身份证号', '残疾证号', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型'];
 }
 
 // 显示提示信息
@@ -525,7 +525,7 @@ function renderComparisonTable() {
     }
 
     // 三列并排布局
-    const columns = ['序号', '姓名', '身份证', '残疾证号'];
+    const columns = ['序号', '姓名', '身份证号', '残疾证号'];
 
     let html = '<div class="compare-grid">';
 
@@ -553,7 +553,7 @@ function renderComparisonTable() {
                                     <tr class="${rowClass}" data-key="${person._key}" data-sheet="${sheetName}" data-row="${record._row_index}">
                                         <td class="row-number">${rowIndex + 1}</td>
                                         <td class="editable" data-field="姓名">${record['姓名'] || '-'}</td>
-                                        <td class="editable" data-field="身份证">${record['身份证'] || '-'}</td>
+                                        <td class="editable" data-field="身份证号">${record['身份证号'] || '-'}</td>
                                         <td class="editable" data-field="残疾证号">${record['残疾证号'] || '-'}</td>
                                     </tr>
                                 `;
@@ -639,7 +639,7 @@ function exportComparisonView() {
         filteredList = people_list.filter(p => !p._is_same);
     }
 
-    const rows = [['序号', ...sheet_names.map(s => `${s}_姓名`), ...sheet_names.map(s => `${s}_身份证`), ...sheet_names.map(s => `${s}_残疾证号`), '状态']];
+    const rows = [['序号', ...sheet_names.map(s => `${s}_姓名`), ...sheet_names.map(s => `${s}_身份证号`), ...sheet_names.map(s => `${s}_残疾证号`), '状态']];
 
     filteredList.forEach((person, idx) => {
         const row = [idx + 1];
@@ -649,7 +649,7 @@ function exportComparisonView() {
         });
         sheet_names.forEach(sheet => {
             const record = person._sheets[sheet];
-            row.push(record ? record['身份证'] || '' : '');
+            row.push(record ? record['身份证号'] || '' : '');
         });
         sheet_names.forEach(sheet => {
             const record = person._sheets[sheet];
