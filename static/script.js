@@ -428,7 +428,7 @@ function renderComparisonInterface() {
         return;
     }
 
-    const { stats, complete_groups, incomplete_groups } = comparisonResults;
+    const { stats, sheet_names, complete_groups, incomplete_groups } = comparisonResults;
 
     // 显示统计
     document.getElementById('comparisonSummary').innerHTML = `
@@ -443,6 +443,10 @@ function renderComparisonInterface() {
         <div class="summary-item">
             <h4>不完善数据</h4>
             <div class="value" style="color: #dc3545">${stats.incomplete_count}</div>
+        </div>
+        <div class="summary-item">
+            <h4>存在差异</h4>
+            <div class="value" style="color: #ffc107">${stats.with_diff_count}</div>
         </div>
     `;
 
@@ -494,26 +498,54 @@ function renderComparisonTable() {
     let dataToRender = currentComparisonTab === 'complete' ? comparisonResults.complete_groups : comparisonResults.incomplete_groups;
 
     if (!dataToRender || dataToRender.length === 0) {
-        document.getElementById('comparisonContent').innerHTML = '<p>暂无数据</p>';
+        document.getElementById('comparisonContent').innerHTML = '<p class="no-data-message">暂无数据</p>';
         return;
     }
 
+    const sheetNames = comparisonResults.sheet_names || [];
+
     const tableHtml = `
+        <div class="comparison-toolbar">
+            <input type="text" id="searchInput" placeholder="搜索姓名..." class="search-input">
+            <button class="btn btn-success" onclick="exportCurrentView()">导出当前视图</button>
+        </div>
         <table class="comparison-table">
             <thead>
                 <tr>
+                    <th style="width: 30px"></th>
                     <th>姓名</th>
-                    ${standardFields.filter(f => f !== '姓名').map(field => `<th>${field}</th>`).join('')}
-                    <th>来源</th>
+                    <th>身份证</th>
+                    <th>残疾证号</th>
+                    <th>完善度</th>
+                    <th>差异</th>
+                    <th>来源Sheet</th>
                 </tr>
             </thead>
             <tbody>
-                ${dataToRender.map(group => {
-                    const sources = group._records.map(r => r.sheet_name).join(', ');
+                ${dataToRender.map((group, index) => {
+                    const diffCount = Object.keys(group._field_diffs || {}).length;
+                    const completeness = Math.round(group._completeness / 9 * 100);
+                    const diffBadge = diffCount > 0 ?
+                        `<span class="diff-badge" title="${diffCount}个字段有差异">${diffCount}</span>` :
+                        '<span class="ok-badge">✓</span>';
+
                     return `
-                        <tr class="${group._is_complete ? 'complete' : 'incomplete'}">
-                            ${standardFields.map(field => `<td>${group[field] || '-'}</td>`).join('')}
-                            <td><small>${sources}</small></td>
+                        <tr class="comparison-row ${group._has_diff ? 'has-diff' : ''} ${group._completeness < 7 ? 'incomplete' : ''}"
+                            data-index="${index}" onclick="toggleDetail(${index})">
+                            <td class="expand-icon">▶</td>
+                            <td><strong>${group['姓名'] || '-'}</strong></td>
+                            <td>${group['身份证'] || '-'}</td>
+                            <td>${group['残疾证号'] || '-'}</td>
+                            <td><span class="completeness-bar" style="width: ${completeness}%">${completeness}%</span></td>
+                            <td>${diffBadge}</td>
+                            <td><small>${group._sheets.join(', ')}</small></td>
+                        </tr>
+                        <tr class="detail-row" id="detail-${index}" style="display: none;">
+                            <td colspan="7">
+                                <div class="detail-content">
+                                    ${renderDetailView(group, sheetNames, standardFields)}
+                                </div>
+                            </td>
                         </tr>
                     `;
                 }).join('')}
@@ -522,6 +554,94 @@ function renderComparisonTable() {
     `;
 
     document.getElementById('comparisonContent').innerHTML = tableHtml;
+
+    // 绑定搜索
+    document.getElementById('searchInput').addEventListener('input', (e) => {
+        const keyword = e.target.value.toLowerCase();
+        document.querySelectorAll('.comparison-row').forEach(row => {
+            const name = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
+            row.style.display = name.includes(keyword) ? '' : 'none';
+        });
+    });
+}
+
+function toggleDetail(index) {
+    const detailRow = document.getElementById(`detail-${index}`);
+    const icon = document.querySelector(`tr[data-index="${index}"] .expand-icon`);
+
+    if (detailRow.style.display === 'none') {
+        detailRow.style.display = 'table-row';
+        icon.textContent = '▼';
+    } else {
+        detailRow.style.display = 'none';
+        icon.textContent = '▶';
+    }
+}
+
+function renderDetailView(group, sheetNames, standardFields) {
+    let html = '<table class="detail-table"><thead><tr><th>字段</th>';
+
+    sheetNames.forEach(name => {
+        html += `<th>${name}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+
+    standardFields.forEach(field => {
+        const values = {};
+        sheetNames.forEach(sheet => {
+            const record = group._sheet_data[sheet];
+            values[sheet] = record ? record[field] || '' : '';
+        });
+
+        // 检查是否有差异
+        const uniqueValues = new Set(Object.values(values).filter(v => v));
+        const hasDiff = uniqueValues.size > 1;
+
+        html += `<tr class="${hasDiff ? 'field-diff' : ''}">`;
+        html += `<td><strong>${field}</strong></td>`;
+
+        sheetNames.forEach(sheet => {
+            const val = values[sheet];
+            const displayVal = val || '<span class="empty">空</span>';
+            html += `<td class="${hasDiff && val ? 'highlight-diff' : ''}">${displayVal}</td>`;
+        });
+
+        html += '</tr>';
+    });
+
+    html += '</tbody></table>';
+    return html;
+}
+
+function exportCurrentView() {
+    let dataToExport = currentComparisonTab === 'complete' ?
+        comparisonResults.complete_groups : comparisonResults.incomplete_groups;
+
+    const standardFields = getStandardFields();
+    const sheetNames = comparisonResults.sheet_names || [];
+
+    const rows = [['姓名', ...standardFields.filter(f => f !== '姓名'), '完善度', '差异字段数', ...sheetNames]];
+
+    dataToExport.forEach(group => {
+        const row = [
+            group['姓名'] || '',
+            ...standardFields.filter(f => f !== '姓名').map(f => group[f] || ''),
+            Math.round(group._completeness / 9 * 100) + '%',
+            Object.keys(group._field_diffs || {}).length,
+            ...sheetNames.map(sheet => {
+                const record = group._sheet_data[sheet];
+                return record ? '✓' : '-';
+            })
+        ];
+        rows.push(row);
+    });
+
+    const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `比对结果_${currentComparisonTab}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
 }
 
 // 导出比对数据

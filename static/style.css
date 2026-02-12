@@ -777,6 +777,113 @@ select:focus {
     background: #f8d7da;
 }
 
+/* 对比表格样式 */
+.comparison-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.search-input {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 14px;
+    width: 200px;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.comparison-row {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.comparison-row:hover {
+    background: #f0f0f0 !important;
+}
+
+.comparison-row.has-diff {
+    background: #fff3cd !important;
+}
+
+.expand-icon {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.detail-row {
+    background: #fafafa !important;
+}
+
+.detail-content {
+    padding: 16px;
+}
+
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.detail-table th {
+    background: #e7f3ff;
+    padding: 8px 12px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+}
+
+.detail-table td {
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+}
+
+.field-diff {
+    background: #fff3cd;
+}
+
+.highlight-diff {
+    background: #ffeaa7;
+    font-weight: 600;
+}
+
+.empty {
+    color: #999;
+    font-style: italic;
+}
+
+.diff-badge {
+    display: inline-block;
+    background: #dc3545;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.ok-badge {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.completeness-bar {
+    display: inline-block;
+    background: linear-gradient(90deg, #28a745, #ffc107);
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    color: white;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
 /* Toast */
 .toast {
     position: fixed;

@@ -283,7 +283,7 @@ def get_columns():
 
 @app.route('/api/compare', methods=['POST'])
 def compare_data():
-    """数据比对：基于5个关键字段判断相似，按数据完整性分组"""
+    """数据比对：基于姓名+身份证号识别同一人，检测跨Sheet数据差异"""
     try:
         data = request.json
         filename = data.get('filename')
@@ -296,11 +296,13 @@ def compare_data():
         if not os.path.exists(filepath):
             return jsonify({'error': '文件不存在'}), 404
 
-        # 先获取映射后的数据
+        # 获取映射后的数据
         excel_data = pd.ExcelFile(filepath)
         all_records = []
+        sheet_names = []
 
         for sheet_name in excel_data.sheet_names:
+            sheet_names.append(sheet_name)
             sheet_mapping = mappings.get(sheet_name, {})
             header_row = sheet_mapping.get('header_row', 0)
             field_mapping = sheet_mapping.get('fields', {})
@@ -311,7 +313,7 @@ def compare_data():
             df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
 
             for idx, row in df.iterrows():
-                record = {'sheet_name': sheet_name, 'row_index': idx}
+                record = {'_sheet_name': sheet_name, '_row_index': idx}
 
                 for field in get_standard_fields():
                     col_name = field_mapping.get(field)
@@ -321,68 +323,104 @@ def compare_data():
                     else:
                         record[field] = ''
 
-                all_records.append(record)
+                # 只保留有姓名的记录
+                if record.get('姓名') and record['姓名'].strip():
+                    all_records.append(record)
 
-        # 定义关键字段
-        key_fields = ['姓名', '身份证', '残疾证号', '残疾证类型', '残疾证等级']
-
-        # 构建相似度分组
-        groups = {}  # key -> {records: [], is_complete: bool}
+        # 按姓名+身份证号分组
+        people_dict = {}
 
         for record in all_records:
-            # 生成相似度键（5个关键字段的组合）
-            key_tuple = tuple(record.get(field, '') for field in key_fields)
-            key_str = '|'.join(key_tuple)
+            name = record.get('姓名', '').strip()
+            id_card = record.get('身份证', '').strip()
 
-            if key_str not in groups:
-                groups[key_str] = {'records': [], 'is_complete': False}
+            # 使用姓名+身份证号作为唯一键
+            key = f"{name}_{id_card}" if name else None
 
-            groups[key_str]['records'].append(record)
+            if not key:
+                continue
 
-            # 判断是否完善（9个字段中≥7个非空）
-            non_empty_count = sum(1 for k, v in record.items() if k not in ['sheet_name', 'row_index'] and v and v.strip())
-            groups[key_str]['is_complete'] = non_empty_count >= 7
+            if key not in people_dict:
+                people_dict[key] = {
+                    '_key': key,
+                    '_name': name,
+                    '_sheets': {},
+                    '_records': []
+                }
 
-        # 分类并排序
-        complete_groups = []
-        incomplete_groups = []
+            sheet_name = record['_sheet_name']
+            people_dict[key]['_sheets'][sheet_name] = record
+            people_dict[key]['_records'].append(record)
 
-        for key, group_data in groups.items():
-            # 合并多条记录（取第一个非空值）
-            merged = {}
+        # 分析每组数据，检测差异
+        result_groups = []
 
-            # 计算相似度（基于5个关键字段的非空匹配数）
-            key_match_count = sum(1 for field in key_fields if any(
-                r.get(field) and r.get(field).strip() for r in group_data['records']
-            ))
+        for key, person in people_dict.items():
+            records = person['_records']
+            sheets = list(person['_sheets'].keys())
 
-            # 合并数据
+            # 计算完善度（每个Sheet的完善度）
+            completeness_scores = []
+            for sheet, record in person['_sheets'].items():
+                non_empty = sum(1 for f in get_standard_fields() if record.get(f) and record.get(f).strip())
+                completeness_scores.append(non_empty)
+
+            avg_completeness = sum(completeness_scores) / len(completeness_scores) if completeness_scores else 0
+
+            # 检测字段差异
+            field_diffs = {}
             for field in get_standard_fields():
-                values = [r.get(field, '') for r in group_data['records'] if r.get(field) and r.get(field).strip()]
-                merged[field] = values[0] if values else ''
+                values = {}
+                for sheet, record in person['_sheets'].items():
+                    val = record.get(field, '').strip()
+                    if val:
+                        values[sheet] = val
 
-            merged['_key_match_count'] = key_match_count
-            merged['_records'] = group_data['records']  # 保留原始记录用于详情查看
-            merged['_is_complete'] = group_data['is_complete']
+                # 检查是否有差异
+                unique_values = set(values.values())
+                if len(unique_values) > 1:
+                    field_diffs[field] = values
 
-            # 分类
-            if group_data['is_complete']:
-                complete_groups.append(merged)
-            else:
-                incomplete_groups.append(merged)
+            # 合并数据（取最完善的记录）
+            merged = {}
+            for field in get_standard_fields():
+                # 优先取非空值
+                for record in records:
+                    val = record.get(field, '').strip()
+                    if val:
+                        merged[field] = val
+                        break
+                if field not in merged:
+                    merged[field] = ''
 
-        # 排序：按姓名字母顺序
-        complete_groups.sort(key=lambda x: x.get('姓名', ''))
-        incomplete_groups.sort(key=lambda x: x.get('姓名', ''))
+            result_groups.append({
+                '_key': key,
+                '_name': person['_name'],
+                '_sheets': sheets,
+                '_sheet_data': person['_sheets'],
+                '_completeness': avg_completeness,
+                '_has_diff': len(field_diffs) > 0,
+                '_field_diffs': field_diffs,
+                **merged
+            })
+
+        # 排序：按完善度降序，然后按姓名
+        result_groups.sort(key=lambda x: (-x['_completeness'], x['_name']))
+
+        # 分类：完善（≥7字段且无差异）vs 不完善
+        complete_groups = [g for g in result_groups if g['_completeness'] >= 7 and not g['_has_diff']]
+        incomplete_groups = [g for g in result_groups if g['_completeness'] < 7 or g['_has_diff']]
 
         return jsonify({
             'success': True,
+            'sheet_names': sheet_names,
             'complete_groups': complete_groups,
             'incomplete_groups': incomplete_groups,
             'stats': {
-                'total_groups': len(complete_groups) + len(incomplete_groups),
+                'total_groups': len(result_groups),
                 'complete_count': len(complete_groups),
-                'incomplete_count': len(incomplete_groups)
+                'incomplete_count': len(incomplete_groups),
+                'with_diff_count': sum(1 for g in result_groups if g['_has_diff'])
             }
         })
 
