@@ -121,6 +121,12 @@ const DOM_BINDINGS = {
                     if (data.success) {
                         window.analysisResults = data.results;
                         mappedResults = data.results;
+                        
+                        // 保存映射配置到缓存
+                        if (fileId) {
+                            saveMappingCache(fileId, mappings, headerRows);
+                        }
+                        
                         renderMappedDataView();
                         showToast('数据映射完成');
                     } else {

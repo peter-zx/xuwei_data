@@ -10,6 +10,8 @@ let mappedResults = null;
 let comparisonResults = null;
 let currentComparisonFilter = 'all';
 let currentComparisonTab = 0;
+let fileId = null; // 文件唯一标识
+let cachedConfig = null; // 缓存的配置
 
 // DOM 元素
 const uploadArea = document.getElementById('uploadArea');
@@ -79,6 +81,14 @@ async function handleFile(file) {
                     <span class="sheet-stats">${sheet.rows} 行 × ${sheet.columns} 列</span>
                 </div>
             `).join('');
+
+            // 生成文件ID并检查缓存
+            fileId = generateFileId(file.name, file.size, data.sheet_count);
+            cachedConfig = loadMappingCache(fileId);
+            
+            if (cachedConfig) {
+                showToast('已加载上次配置的映射', 'success');
+            }
 
             uploadArea.style.display = 'none';
             fileInfo.style.display = 'block';
@@ -243,6 +253,12 @@ async function loadSheetColumns() {
 // 渲染映射界面
 function renderMappingInterface() {
     const container = document.getElementById('mappingSheets');
+
+    // 如果有缓存配置，优先使用
+    if (cachedConfig && !Object.keys(mappings).length) {
+        headerRows = cachedConfig.headerRows || {};
+        mappings = cachedConfig.mappings || {};
+    }
 
     container.innerHTML = fileData.map(sheet => {
         const columns = sheetColumns[sheet.name] || [];

@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import threading
 import time
+from excel_processor import process_excel_with_formulas, convert_xls_to_xlsx_with_calculation
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
@@ -24,8 +25,24 @@ def allowed_file(filename):
 
 
 def clean_column_name(col_name):
-    """清理列名：去掉换行符和多余空格"""
-    return str(col_name).replace('\n', '').strip()
+    """清理列名和单元格内容：去掉换行符、多余空格、科学计数法等"""
+    if col_name is None:
+        return ''
+    
+    # 转换为字符串
+    text = str(col_name)
+    
+    # 去除换行符、制表符
+    text = text.replace('\n', ' ').replace('\r', ' ').replace('\t', ' ')
+    
+    # 去除首尾空格
+    text = text.strip()
+    
+    # 合并多个连续空格为一个
+    while '  ' in text:
+        text = text.replace('  ', ' ')
+    
+    return text
 
 
 def get_standard_fields():
@@ -41,24 +58,71 @@ def get_cache_path(filename):
 
 
 def copy_to_cache(original_path):
-    """复制文件到缓存目录，去除公式"""
+    """复制文件到缓存目录，处理公式并保留计算后的值"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     original_name = os.path.basename(original_path)
-    cache_name = f"{timestamp}_{original_name}"
-    cache_path = os.path.join(app.config['CACHE_FOLDER'], cache_name)
-
+    
+    # 转换为绝对路径
+    original_path = os.path.abspath(original_path)
+    
+    # 获取缓存目录的绝对路径
+    cache_dir = os.path.abspath(app.config['CACHE_FOLDER'])
+    
+    # 检测文件实际格式
+    with open(original_path, 'rb') as f:
+        header = f.read(8)
+        # XLS 格式的文件头: D0 CF 11 E0 A1 B1 1A E1
+        is_xls = header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1'
+        # XLSX 格式的文件头: PK (ZIP格式)
+        is_xlsx = header[:2] == b'PK'
+    
+    print(f'文件格式检测: XLS={is_xls}, XLSX={is_xlsx}, 文件名={original_name}')
+    
+    # 确定缓存文件名（强制使用 .xlsx）
+    base_name = original_name.rsplit('.', 1)[0] if '.' in original_name else original_name
+    cache_name = f"{timestamp}_{base_name}.xlsx"
+    cache_path = os.path.join(cache_dir, cache_name)
+    
+    print(f'缓存文件路径: {cache_path}')
+    
     try:
-        # 读取Excel文件，pandas会自动计算公式值
-        excel_data = pd.ExcelFile(original_path)
-
+        # 直接使用 pandas 读取并保存（会自动处理公式）
+        print('使用 pandas 处理文件...')
+        
+        # 根据 format 选择引擎
+        engine = 'xlrd' if is_xls else None
+        excel_data = pd.ExcelFile(original_path, engine=engine)
+        
         with pd.ExcelWriter(cache_path, engine='openpyxl') as writer:
             for sheet_name in excel_data.sheet_names:
-                # 读取数据，公式会被计算为实际值
-                df = pd.read_excel(original_path, sheet_name=sheet_name)
+                print(f'  处理 Sheet: {sheet_name}')
+                df = pd.read_excel(original_path, sheet_name=sheet_name, engine=engine)
+                
+                # 格式化数据（可选）
+                for col in df.columns:
+                    if df[col].dtype == 'float64':
+                        df[col] = df[col].apply(
+                            lambda x: f"{x:.10f}".rstrip('0').rstrip('.') if pd.notna(x) else ''
+                        )
+                    elif df[col].dtype == 'object':
+                        df[col] = df[col].apply(
+                            lambda x: clean_column_name(str(x)) if pd.notna(x) and str(x) != 'nan' else ''
+                        )
+                
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
-
+        
+        # 验证缓存文件
+        if not os.path.exists(cache_path):
+            raise Exception('缓存文件创建失败')
+        
+        excel_data = pd.ExcelFile(cache_path)
+        print(f'缓存文件创建成功: {cache_name} ({len(excel_data.sheet_names)} 个 Sheet)')
+        
         return cache_name
+        
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise Exception(f'缓存文件创建失败: {str(e)}')
 
 
@@ -175,7 +239,6 @@ def analyze_sheets():
                 header_row = sheet_mapping.get('header_row', 0)
                 field_mapping = sheet_mapping.get('fields', {})
 
-                # 确保field_mapping不为None
                 if field_mapping is None:
                     field_mapping = {}
 
@@ -188,13 +251,17 @@ def analyze_sheets():
                     for field in get_standard_fields():
                         col_name = field_mapping.get(field)
                         if col_name and col_name.strip() and col_name in df.columns:
-                            value = str(row[col_name]) if pd.notna(row[col_name]) else ''
-                            record[field] = value
+                            value = row[col_name]
+                            if pd.notna(value):
+                                if isinstance(value, float):
+                                    record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
+                                else:
+                                    record[field] = clean_column_name(str(value))
+                            else:
+                                record[field] = ''
                         else:
-                            # 未映射的字段或列不存在，留空
                             record[field] = ''
 
-                    # 保留所有原始数据行
                     extracted_data.append(record)
 
                 sheet_result['mapping'] = field_mapping
@@ -203,6 +270,8 @@ def analyze_sheets():
                 results.append(sheet_result)
 
             except Exception as e:
+                import traceback
+                traceback.print_exc()
                 sheet_result['success'] = False
                 sheet_result['error'] = str(e)
                 results.append(sheet_result)
@@ -211,6 +280,11 @@ def analyze_sheets():
             'success': True,
             'results': results
         })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'映射失败: {str(e)}'}), 500
 
     except Exception as e:
         return jsonify({'error': f'映射失败: {str(e)}'}), 500
@@ -238,7 +312,16 @@ def sheet_preview():
 
         preview_data = []
         for idx, row in df.iterrows():
-            row_data = [clean_column_name(cell) if pd.notna(cell) else '' for cell in row]
+            row_data = []
+            for cell in row:
+                if pd.notna(cell):
+                    if isinstance(cell, float):
+                        formatted = f"{cell:.10f}".rstrip('0').rstrip('.')
+                        row_data.append(formatted)
+                    else:
+                        row_data.append(clean_column_name(str(cell)))
+                else:
+                    row_data.append('')
             preview_data.append(row_data)
 
         return jsonify({
@@ -270,7 +353,11 @@ def get_columns():
 
         df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
 
-        columns = [clean_column_name(col) for col in df.columns if not str(col).startswith('Unnamed')]
+        columns = []
+        for col in df.columns:
+            col_name = clean_column_name(col)
+            if col_name and not col_name.startswith('Unnamed'):
+                columns.append(col_name)
 
         return jsonify({
             'success': True,
@@ -317,8 +404,14 @@ def compare_data():
                 for field in get_standard_fields():
                     col_name = field_mapping.get(field)
                     if col_name and col_name.strip() and col_name in df.columns:
-                        value = str(row[col_name]) if pd.notna(row[col_name]) else ''
-                        record[field] = value
+                        value = row[col_name]
+                        if pd.notna(value):
+                            if isinstance(value, float):
+                                record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
+                            else:
+                                record[field] = clean_column_name(str(value))
+                        else:
+                            record[field] = ''
                     else:
                         record[field] = ''
 
@@ -329,7 +422,7 @@ def compare_data():
             sheets_data[sheet_name] = records
 
         # 获取所有唯一的人（按姓名+身份证号）
-        all_people = {}  # key: "姓名_身份证" -> {name, id_card, sheets: {sheet_name: record}}
+        all_people = {}
 
         for sheet_name, records in sheets_data.items():
             for record in records:
@@ -350,11 +443,11 @@ def compare_data():
 
                 all_people[key]['_sheets'][sheet_name] = record
 
-        # 转换为列表并排序（按姓名+身份证号）
+        # 转换为列表并排序
         people_list = list(all_people.values())
         people_list.sort(key=lambda x: (x['_name'], x['_id_card']))
 
-        # 判断是否为相同人（在所有Sheet中都存在）
+        # 判断是否为相同人
         sheet_names = list(sheets_data.keys())
         total_sheets = len(sheet_names)
 
