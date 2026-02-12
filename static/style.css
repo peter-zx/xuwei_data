@@ -823,16 +823,32 @@ select:focus {
     font-weight: 600;
     color: var(--text-secondary);
     border-bottom: 2px solid var(--border-color);
+    border-right: 1px solid rgba(222, 226, 230, 0.5);
     font-size: 12px;
+}
+
+.compare-table th:last-child {
+    border-right: none;
 }
 
 .compare-table td {
     padding: 8px;
     border-bottom: 1px solid var(--border-color);
+    border-right: 1px solid rgba(222, 226, 230, 0.5);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 150px;
+}
+
+.compare-table td:last-child {
+    border-right: none;
+}
+
+.compare-table .row-number {
+    text-align: center;
+    font-weight: 500;
+    min-width: 40px;
 }
 
 .compare-table tbody tr:hover {

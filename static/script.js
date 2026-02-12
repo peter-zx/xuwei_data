@@ -530,9 +530,12 @@ function renderComparisonTable() {
     let html = '<div class="compare-grid">';
 
     sheet_names.forEach((sheetName, sheetIndex) => {
+        // 计算该sheet实际有数据的记录数
+        const sheetDataCount = filteredList.filter(p => p._sheets[sheetName]).length;
+        
         html += `
             <div class="compare-column">
-                <div class="compare-column-header">${sheetName}</div>
+                <div class="compare-column-header">${sheetName} (${sheetDataCount}条)</div>
                 <table class="compare-table">
                     <thead>
                         <tr>
@@ -548,7 +551,7 @@ function renderComparisonTable() {
                             if (record) {
                                 return `
                                     <tr class="${rowClass}" data-key="${person._key}" data-sheet="${sheetName}" data-row="${record._row_index}">
-                                        <td>${rowIndex + 1}</td>
+                                        <td class="row-number">${rowIndex + 1}</td>
                                         <td class="editable" data-field="姓名">${record['姓名'] || '-'}</td>
                                         <td class="editable" data-field="身份证">${record['身份证'] || '-'}</td>
                                         <td class="editable" data-field="残疾证号">${record['残疾证号'] || '-'}</td>
@@ -557,7 +560,7 @@ function renderComparisonTable() {
                             } else {
                                 return `
                                     <tr class="row-empty">
-                                        <td>${rowIndex + 1}</td>
+                                        <td class="row-number">${rowIndex + 1}</td>
                                         <td colspan="3">-</td>
                                     </tr>
                                 `;

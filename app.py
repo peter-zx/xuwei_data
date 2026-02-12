@@ -392,7 +392,7 @@ def get_columns():
 
 @app.route('/api/compare', methods=['POST'])
 def compare_data():
-    """数据比对：三列并排显示，按姓名+身份证号对齐"""
+    """数据比对：三列并排显示，按姓名+身份证号或残疾证号对齐"""
     try:
         data = request.json
         filename = data.get('filename')
@@ -460,39 +460,92 @@ def compare_data():
 
             sheets_data[sheet_name] = records
 
-        # 获取所有唯一的人（按姓名+身份证号）
-        all_people = {}
+        # 新的匹配策略：姓名 + (身份证 或 残疾证号)
+        # 使用字典来合并相同的人
+        all_people = {}  # person_id -> person_data
+        match_keys_map = {}  # match_key -> person_id
 
         for sheet_name, records in sheets_data.items():
             for record in records:
                 name = record.get('姓名', '').strip()
                 id_card = record.get('身份证', '').strip()
-                key = f"{name}_{id_card}" if name else None
-
-                if not key:
+                disability_card = record.get('残疾证号', '').strip()
+                
+                if not name:
                     continue
-
-                if key not in all_people:
-                    all_people[key] = {
-                        '_key': key,
+                
+                # 生成所有可能的匹配键
+                match_keys = []
+                if id_card:
+                    match_keys.append(f"{name}_{id_card}")
+                if disability_card:
+                    match_keys.append(f"{name}_{disability_card}")
+                
+                # 如果既没有身份证也没有残疾证号，只用姓名
+                if not match_keys:
+                    match_keys.append(f"{name}_")
+                
+                # 检查是否已经存在这个人
+                person_id = None
+                for key in match_keys:
+                    if key in match_keys_map:
+                        person_id = match_keys_map[key]
+                        break
+                
+                # 如果不存在，创建新人
+                if person_id is None:
+                    person_id = f"person_{len(all_people)}"
+                    all_people[person_id] = {
+                        '_key': person_id,
                         '_name': name,
-                        '_id_card': id_card,
+                        '_id_cards': set(),
+                        '_disability_cards': set(),
                         '_sheets': {}
                     }
-
-                all_people[key]['_sheets'][sheet_name] = record
+                    
+                    # 将所有匹配键关联到这个人
+                    for key in match_keys:
+                        match_keys_map[key] = person_id
+                
+                # 添加身份证和残疾证号到集合
+                if id_card:
+                    all_people[person_id]['_id_cards'].add(id_card)
+                if disability_card:
+                    all_people[person_id]['_disability_cards'].add(disability_card)
+                
+                # 添加sheet记录
+                all_people[person_id]['_sheets'][sheet_name] = record
 
         # 转换为列表并排序
         people_list = list(all_people.values())
-        people_list.sort(key=lambda x: (x['_name'], x['_id_card']))
+        people_list.sort(key=lambda x: x['_name'])
+        
+        # 转换set为字符串用于显示
+        for person in people_list:
+            person['_id_cards'] = list(person['_id_cards'])
+            person['_disability_cards'] = list(person['_disability_cards'])
 
-        # 判断是否为相同人
+        # 判断是否为"相同人"
+        # 规则：在所有sheet中都有记录，且身份证和残疾证号一致
         sheet_names = list(sheets_data.keys())
         total_sheets = len(sheet_names)
 
         for person in people_list:
-            person['_is_same'] = len(person['_sheets']) == total_sheets
+            # 检查是否在所有sheet中都有记录
+            in_all_sheets = len(person['_sheets']) == total_sheets
+            
+            # 检查身份证是否一致（只有一个身份证号）
+            id_card_consistent = len(person['_id_cards']) <= 1
+            
+            # 检查残疾证号是否一致（只有一个残疾证号）
+            disability_card_consistent = len(person['_disability_cards']) <= 1
+            
+            # 判断是否为相同人
+            person['_is_same'] = in_all_sheets and id_card_consistent and disability_card_consistent
             person['_sheet_count'] = len(person['_sheets'])
+            person['_in_all_sheets'] = in_all_sheets
+            person['_id_card_consistent'] = id_card_consistent
+            person['_disability_card_consistent'] = disability_card_consistent
 
         # 统计
         same_count = sum(1 for p in people_list if p['_is_same'])
