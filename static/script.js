@@ -54,30 +54,6 @@ function updateStep(step) {
     currentStep = step;
 }
 
-// 文件上传相关
-uploadArea.addEventListener('click', () => fileInput.click());
-uploadArea.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadArea.classList.add('dragover');
-});
-uploadArea.addEventListener('dragleave', () => {
-    uploadArea.classList.remove('dragover');
-});
-uploadArea.addEventListener('drop', (e) => {
-    e.preventDefault();
-    uploadArea.classList.remove('dragover');
-    const files = e.dataTransfer.files;
-    if (files.length > 0) {
-        handleFile(files[0]);
-    }
-});
-
-fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-        handleFile(e.target.files[0]);
-    }
-});
-
 async function handleFile(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -115,12 +91,6 @@ async function handleFile(file) {
     }
 }
 
-// 重新上传
-document.getElementById('reuploadBtn').addEventListener('click', () => {
-    resetAll();
-    updateStep(1);
-});
-
 // 重置所有状态
 function resetAll() {
     uploadedFile = null;
@@ -133,13 +103,6 @@ function resetAll() {
     uploadArea.style.display = 'block';
     fileInfo.style.display = 'none';
 }
-
-// 跳转到预览步骤
-document.getElementById('toPreviewBtn').addEventListener('click', async () => {
-    await loadSheetPreviews();
-    renderPreviewInterface();
-    updateStep(2);
-});
 
 // 加载每个Sheet的预览数据
 async function loadSheetPreviews() {
@@ -247,18 +210,6 @@ function bindPreviewEvents() {
     });
 }
 
-// 上一步 - 返回上传
-document.getElementById('backToUploadBtn')?.addEventListener('click', () => {
-    updateStep(1);
-});
-
-// 跳转到映射步骤
-document.getElementById('toMappingBtn').addEventListener('click', async () => {
-    await loadSheetColumns();
-    renderMappingInterface();
-    updateStep(3);
-});
-
 // 加载每个Sheet的列名
 async function loadSheetColumns() {
     for (const sheet of fileData) {
@@ -359,59 +310,6 @@ function bindMappingEvents() {
     });
 }
 
-// 上一步 - 返回预览
-document.getElementById('backToPreviewBtn').addEventListener('click', () => {
-    updateStep(2);
-});
-
-// 分析数据
-document.getElementById('toAnalyzeBtn').addEventListener('click', async () => {
-    updateStep(4);
-
-    // 清理空的字段映射
-    Object.keys(mappings).forEach(sheetName => {
-        if (mappings[sheetName] && mappings[sheetName].fields) {
-            const cleanedFields = {};
-            Object.entries(mappings[sheetName].fields).forEach(([field, value]) => {
-                if (value && value.trim() !== '') {
-                    cleanedFields[field] = value;
-                }
-            });
-            mappings[sheetName].fields = cleanedFields;
-        }
-    });
-
-    try {
-        const response = await fetch('/api/analyze', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                filename: uploadedFile,
-                mappings: mappings
-            })
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-            window.analysisResults = data.results;
-            mappedResults = data.results;
-            renderMappedDataView(); // 显示映射后的原始数据
-            showToast('数据映射完成');
-        } else {
-            console.error('映射失败:', data.error);
-            showToast(data.error, 'error');
-            updateStep(3);
-        }
-    } catch (error) {
-        console.error('请求失败:', error);
-        showToast('映射失败，请重试', 'error');
-        updateStep(3);
-    }
-});
-
-
-
 // 渲染映射数据视图（环节4）
 function renderMappedDataView() {
     if (!mappedResults) return;
@@ -493,59 +391,6 @@ function showMappedDataPanel(index) {
     }
 
     document.getElementById('dataViewContent').innerHTML = html;
-}
-
-// 环节4: 返回配置映射
-const backToMappingBtn = document.getElementById('backToMappingBtn');
-if (backToMappingBtn) {
-    backToMappingBtn.addEventListener('click', () => {
-        updateStep(3);
-    });
-}
-
-// 环节4: 进入数据比对
-const toComparisonBtn = document.getElementById('toComparisonBtn');
-if (toComparisonBtn) {
-    toComparisonBtn.addEventListener('click', async () => {
-        await performDataComparison();
-        updateStep(5);
-    });
-}
-
-// 重新配置映射
-
-// 数据比对 - 返回数据视图
-const backToDataViewBtn = document.getElementById('backToDataViewBtn');
-if (backToDataViewBtn) {
-    backToDataViewBtn.addEventListener('click', () => {
-        updateStep(4);
-    });
-}
-
-// 数据比对 - 查看结果
-const toResultsBtn = document.getElementById('toResultsBtn');
-if (toResultsBtn) {
-    toResultsBtn.addEventListener('click', () => {
-        renderFinalResults();
-        updateStep(6);
-    });
-}
-
-// 结果页 - 返回比对
-const backToComparisonBtn = document.getElementById('backToComparisonBtn');
-if (backToComparisonBtn) {
-    backToComparisonBtn.addEventListener('click', () => {
-        updateStep(5);
-    });
-}
-
-// 重置
-const resetBtn = document.getElementById('resetBtn');
-if (resetBtn) {
-    resetBtn.addEventListener('click', () => {
-        resetAll();
-        updateStep(1);
-    });
 }
 
 // 执行数据比对
