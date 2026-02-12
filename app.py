@@ -224,6 +224,8 @@ def analyze_sheets():
 
         results = []
         excel_data = pd.ExcelFile(filepath)
+        
+        import re
 
         for sheet_name in excel_data.sheet_names:
             sheet_result = {
@@ -243,6 +245,14 @@ def analyze_sheets():
                     field_mapping = {}
 
                 df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
+                
+                # 创建列名映射字典（清理后的列名 -> 原始列名）
+                col_name_map = {}
+                for orig_col in df.columns:
+                    cleaned_col = clean_column_name(orig_col)
+                    cleaned_col = re.sub(r'[（(].*?[）)]', '', cleaned_col).strip()
+                    if cleaned_col:
+                        col_name_map[cleaned_col] = orig_col
 
                 extracted_data = []
                 for idx, row in df.iterrows():
@@ -250,13 +260,19 @@ def analyze_sheets():
 
                     for field in get_standard_fields():
                         col_name = field_mapping.get(field)
-                        if col_name and col_name.strip() and col_name in df.columns:
-                            value = row[col_name]
-                            if pd.notna(value):
-                                if isinstance(value, float):
-                                    record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
+                        if col_name and col_name.strip():
+                            # 尝试查找原始列名
+                            orig_col = col_name_map.get(col_name, col_name)
+                            
+                            if orig_col in df.columns:
+                                value = row[orig_col]
+                                if pd.notna(value):
+                                    if isinstance(value, float):
+                                        record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
+                                    else:
+                                        record[field] = clean_column_name(str(value))
                                 else:
-                                    record[field] = clean_column_name(str(value))
+                                    record[field] = ''
                             else:
                                 record[field] = ''
                         else:
@@ -356,8 +372,14 @@ def get_columns():
         columns = []
         for col in df.columns:
             col_name = clean_column_name(col)
-            if col_name and not col_name.startswith('Unnamed'):
-                columns.append(col_name)
+            # 清理列名中的括号及括号内容（通常是备注说明）
+            # 例如：'残疾证号\n（自动填充无需输入）' -> '残疾证号'
+            import re
+            col_name_clean = re.sub(r'[（(].*?[）)]', '', col_name)
+            col_name_clean = col_name_clean.strip()
+            
+            if col_name_clean and not col_name_clean.startswith('Unnamed'):
+                columns.append(col_name_clean)
 
         return jsonify({
             'success': True,
@@ -386,6 +408,8 @@ def compare_data():
         # 获取映射后的数据
         excel_data = pd.ExcelFile(filepath)
         sheets_data = {}
+        
+        import re
 
         for sheet_name in excel_data.sheet_names:
             sheet_mapping = mappings.get(sheet_name, {})
@@ -396,6 +420,15 @@ def compare_data():
                 field_mapping = {}
 
             df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
+            
+            # 创建列名映射字典
+            col_name_map = {}
+            for orig_col in df.columns:
+                cleaned_col = clean_column_name(orig_col)
+                cleaned_col = re.sub(r'[（(].*?[）)]', '', cleaned_col).strip()
+                if cleaned_col:
+                    col_name_map[cleaned_col] = orig_col
+            
             records = []
 
             for idx, row in df.iterrows():
@@ -403,13 +436,19 @@ def compare_data():
 
                 for field in get_standard_fields():
                     col_name = field_mapping.get(field)
-                    if col_name and col_name.strip() and col_name in df.columns:
-                        value = row[col_name]
-                        if pd.notna(value):
-                            if isinstance(value, float):
-                                record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
+                    if col_name and col_name.strip():
+                        # 查找原始列名
+                        orig_col = col_name_map.get(col_name, col_name)
+                        
+                        if orig_col in df.columns:
+                            value = row[orig_col]
+                            if pd.notna(value):
+                                if isinstance(value, float):
+                                    record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
+                                else:
+                                    record[field] = clean_column_name(str(value))
                             else:
-                                record[field] = clean_column_name(str(value))
+                                record[field] = ''
                         else:
                             record[field] = ''
                     else:
