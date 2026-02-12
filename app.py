@@ -45,6 +45,35 @@ def clean_column_name(col_name):
     return text
 
 
+def format_date_value(value):
+    """格式化日期值，只保留年月日"""
+    if pd.isna(value):
+        return ''
+    
+    # 如果是 pandas Timestamp 或 datetime 对象
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return value.strftime('%Y-%m-%d')
+    
+    # 如果是字符串，尝试提取日期部分
+    text = str(value)
+    
+    # 如果包含时间部分 00:00:00，只取日期部分
+    if ' 00:00:00' in text:
+        return text.split(' 00:00:00')[0]
+    
+    # 如果包含其他时间部分，也只取日期部分
+    if ' ' in text:
+        parts = text.split(' ')
+        if len(parts) > 1:
+            # 检查是否是日期时间格式
+            date_part = parts[0]
+            # 如果日期部分看起来像日期格式，返回日期部分
+            if len(date_part) >= 8 and '-' in date_part:
+                return date_part
+    
+    return text
+
+
 def get_standard_fields():
     """返回标准字段列表（可配置）"""
     return ['姓名', '电话', '身份证号', '残疾证号', '身份证到期时间', '残疾证到期时间', '残疾证等级', '残疾证类型']
@@ -267,7 +296,10 @@ def analyze_sheets():
                             if orig_col in df.columns:
                                 value = row[orig_col]
                                 if pd.notna(value):
-                                    if isinstance(value, float):
+                                    # 对日期字段特殊处理
+                                    if field in ['身份证到期时间', '残疾证到期时间']:
+                                        record[field] = format_date_value(value)
+                                    elif isinstance(value, float):
                                         record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
                                     else:
                                         record[field] = clean_column_name(str(value))
@@ -443,7 +475,10 @@ def compare_data():
                         if orig_col in df.columns:
                             value = row[orig_col]
                             if pd.notna(value):
-                                if isinstance(value, float):
+                                # 对日期字段特殊处理
+                                if field in ['身份证到期时间', '残疾证到期时间']:
+                                    record[field] = format_date_value(value)
+                                elif isinstance(value, float):
                                     record[field] = f"{value:.10f}".rstrip('0').rstrip('.')
                                 else:
                                     record[field] = clean_column_name(str(value))
