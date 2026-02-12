@@ -428,45 +428,44 @@ function renderComparisonInterface() {
         return;
     }
 
-    const { stats, sheet_names, complete_groups, incomplete_groups } = comparisonResults;
+    const { stats, sheet_names, people_list } = comparisonResults;
 
     // 显示统计
     document.getElementById('comparisonSummary').innerHTML = `
         <div class="summary-item">
             <h4>总人数</h4>
-            <div class="value">${stats.total_groups}</div>
+            <div class="value">${stats.total}</div>
         </div>
         <div class="summary-item">
-            <h4>完善数据</h4>
-            <div class="value" style="color: #28a745">${stats.complete_count}</div>
+            <h4>相同人</h4>
+            <div class="value" style="color: #28a745">${stats.same_count}</div>
         </div>
         <div class="summary-item">
-            <h4>不完善数据</h4>
-            <div class="value" style="color: #dc3545">${stats.incomplete_count}</div>
-        </div>
-        <div class="summary-item">
-            <h4>存在差异</h4>
-            <div class="value" style="color: #ffc107">${stats.with_diff_count}</div>
+            <h4>非相同人</h4>
+            <div class="value" style="color: #dc3545">${stats.diff_count}</div>
         </div>
     `;
 
-    // 渲染Tab
+    // 渲染筛选按钮
     document.getElementById('comparisonTabs').innerHTML = `
-        <button class="comparison-tab active" data-type="complete">完善数据 (${stats.complete_count})</button>
-        <button class="comparison-tab" data-type="incomplete">不完善数据 (${stats.incomplete_count})</button>
+        <button class="comparison-tab active" data-filter="all">全部 (${stats.total})</button>
+        <button class="comparison-tab" data-filter="same">相同人 (${stats.same_count})</button>
+        <button class="comparison-tab" data-filter="diff">非相同人 (${stats.diff_count})</button>
+        <input type="text" id="compareSearchInput" placeholder="搜索姓名..." class="search-input">
+        <button class="btn btn-success" onclick="exportComparisonView()">导出</button>
     `;
 
-    // 绑定Tab事件
+    // 绑定筛选事件
     document.querySelectorAll('.comparison-tab').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.comparison-tab').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            currentComparisonTab = e.target.dataset.type;
+            currentComparisonFilter = e.target.dataset.filter;
             renderComparisonTable();
         });
     });
 
-    currentComparisonTab = 'complete';
+    currentComparisonFilter = 'all';
     renderComparisonTable();
 }
 
@@ -494,145 +493,150 @@ function exportComparisonData() {
 }
 
 function renderComparisonTable() {
-    const standardFields = getStandardFields();
-    let dataToRender = currentComparisonTab === 'complete' ? comparisonResults.complete_groups : comparisonResults.incomplete_groups;
+    const { sheet_names, people_list } = comparisonResults;
+    let filteredList = people_list;
 
-    if (!dataToRender || dataToRender.length === 0) {
+    // 筛选
+    if (currentComparisonFilter === 'same') {
+        filteredList = people_list.filter(p => p._is_same);
+    } else if (currentComparisonFilter === 'diff') {
+        filteredList = people_list.filter(p => !p._is_same);
+    }
+
+    if (filteredList.length === 0) {
         document.getElementById('comparisonContent').innerHTML = '<p class="no-data-message">暂无数据</p>';
         return;
     }
 
-    const sheetNames = comparisonResults.sheet_names || [];
+    // 三列并排布局
+    const columns = ['序号', '姓名', '身份证', '残疾证号'];
 
-    const tableHtml = `
-        <div class="comparison-toolbar">
-            <input type="text" id="searchInput" placeholder="搜索姓名..." class="search-input">
-            <button class="btn btn-success" onclick="exportCurrentView()">导出当前视图</button>
-        </div>
-        <table class="comparison-table">
-            <thead>
-                <tr>
-                    <th style="width: 30px"></th>
-                    <th>姓名</th>
-                    <th>身份证</th>
-                    <th>残疾证号</th>
-                    <th>完善度</th>
-                    <th>差异</th>
-                    <th>来源Sheet</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${dataToRender.map((group, index) => {
-                    const diffCount = Object.keys(group._field_diffs || {}).length;
-                    const completeness = Math.round(group._completeness / 9 * 100);
-                    const diffBadge = diffCount > 0 ?
-                        `<span class="diff-badge" title="${diffCount}个字段有差异">${diffCount}</span>` :
-                        '<span class="ok-badge">✓</span>';
+    let html = '<div class="compare-grid">';
 
-                    return `
-                        <tr class="comparison-row ${group._has_diff ? 'has-diff' : ''} ${group._completeness < 7 ? 'incomplete' : ''}"
-                            data-index="${index}" onclick="toggleDetail(${index})">
-                            <td class="expand-icon">▶</td>
-                            <td><strong>${group['姓名'] || '-'}</strong></td>
-                            <td>${group['身份证'] || '-'}</td>
-                            <td>${group['残疾证号'] || '-'}</td>
-                            <td><span class="completeness-bar" style="width: ${completeness}%">${completeness}%</span></td>
-                            <td>${diffBadge}</td>
-                            <td><small>${group._sheets.join(', ')}</small></td>
+    sheet_names.forEach((sheetName, sheetIndex) => {
+        html += `
+            <div class="compare-column">
+                <div class="compare-column-header">${sheetName}</div>
+                <table class="compare-table">
+                    <thead>
+                        <tr>
+                            ${columns.map(col => `<th>${col}</th>`).join('')}
                         </tr>
-                        <tr class="detail-row" id="detail-${index}" style="display: none;">
-                            <td colspan="7">
-                                <div class="detail-content">
-                                    ${renderDetailView(group, sheetNames, standardFields)}
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                }).join('')}
-            </tbody>
-        </table>
-    `;
+                    </thead>
+                    <tbody>
+                        ${filteredList.map((person, rowIndex) => {
+                            const record = person._sheets[sheetName];
+                            const isDiff = !person._is_same;
+                            const rowClass = isDiff ? 'row-diff' : '';
 
-    document.getElementById('comparisonContent').innerHTML = tableHtml;
+                            if (record) {
+                                return `
+                                    <tr class="${rowClass}" data-key="${person._key}" data-sheet="${sheetName}" data-row="${record._row_index}">
+                                        <td>${rowIndex + 1}</td>
+                                        <td class="editable" data-field="姓名">${record['姓名'] || '-'}</td>
+                                        <td class="editable" data-field="身份证">${record['身份证'] || '-'}</td>
+                                        <td class="editable" data-field="残疾证号">${record['残疾证号'] || '-'}</td>
+                                    </tr>
+                                `;
+                            } else {
+                                return `
+                                    <tr class="row-empty">
+                                        <td>${rowIndex + 1}</td>
+                                        <td colspan="3">-</td>
+                                    </tr>
+                                `;
+                            }
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+
+    document.getElementById('comparisonContent').innerHTML = html;
 
     // 绑定搜索
-    document.getElementById('searchInput').addEventListener('input', (e) => {
-        const keyword = e.target.value.toLowerCase();
-        document.querySelectorAll('.comparison-row').forEach(row => {
-            const name = row.querySelector('td:nth-child(2)').textContent.toLowerCase();
-            row.style.display = name.includes(keyword) ? '' : 'none';
+    const searchInput = document.getElementById('compareSearchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            const rows = document.querySelectorAll('.compare-table tbody tr');
+            rows.forEach(row => {
+                const name = row.querySelector('td:nth-child(2)')?.textContent.toLowerCase() || '';
+                row.style.display = name.includes(keyword) ? '' : 'none';
+            });
         });
-    });
-}
-
-function toggleDetail(index) {
-    const detailRow = document.getElementById(`detail-${index}`);
-    const icon = document.querySelector(`tr[data-index="${index}"] .expand-icon`);
-
-    if (detailRow.style.display === 'none') {
-        detailRow.style.display = 'table-row';
-        icon.textContent = '▼';
-    } else {
-        detailRow.style.display = 'none';
-        icon.textContent = '▶';
     }
+
+    // 绑定双击编辑
+    document.querySelectorAll('.editable').forEach(cell => {
+        cell.addEventListener('dblclick', (e) => {
+            const cell = e.target;
+            if (cell.querySelector('input')) return; // 已经在编辑中
+
+            const oldValue = cell.textContent;
+            const field = cell.dataset.field;
+            const row = cell.closest('tr');
+            const key = row.dataset.key;
+            const sheetName = row.dataset.sheet;
+
+            cell.innerHTML = `<input type="text" value="${oldValue}" class="edit-input">`;
+            const input = cell.querySelector('input');
+            input.focus();
+            input.select();
+
+            const saveEdit = () => {
+                const newValue = input.value.trim();
+                cell.textContent = newValue || '-';
+
+                // 更新数据
+                if (comparisonResults && comparisonResults.people_list) {
+                    const person = comparisonResults.people_list.find(p => p._key === key);
+                    if (person && person._sheets[sheetName]) {
+                        person._sheets[sheetName][field] = newValue;
+                    }
+                }
+
+                showToast('已编辑');
+            };
+
+            input.addEventListener('blur', saveEdit);
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') saveEdit();
+            });
+        });
+    });
 }
 
-function renderDetailView(group, sheetNames, standardFields) {
-    let html = '<table class="detail-table"><thead><tr><th>字段</th>';
+function exportComparisonView() {
+    const { sheet_names, people_list } = comparisonResults;
+    let filteredList = people_list;
 
-    sheetNames.forEach(name => {
-        html += `<th>${name}</th>`;
-    });
-    html += '</tr></thead><tbody>';
+    if (currentComparisonFilter === 'same') {
+        filteredList = people_list.filter(p => p._is_same);
+    } else if (currentComparisonFilter === 'diff') {
+        filteredList = people_list.filter(p => !p._is_same);
+    }
 
-    standardFields.forEach(field => {
-        const values = {};
-        sheetNames.forEach(sheet => {
-            const record = group._sheet_data[sheet];
-            values[sheet] = record ? record[field] || '' : '';
+    const rows = [['序号', ...sheet_names.map(s => `${s}_姓名`), ...sheet_names.map(s => `${s}_身份证`), ...sheet_names.map(s => `${s}_残疾证号`), '状态']];
+
+    filteredList.forEach((person, idx) => {
+        const row = [idx + 1];
+        sheet_names.forEach(sheet => {
+            const record = person._sheets[sheet];
+            row.push(record ? record['姓名'] || '' : '');
         });
-
-        // 检查是否有差异
-        const uniqueValues = new Set(Object.values(values).filter(v => v));
-        const hasDiff = uniqueValues.size > 1;
-
-        html += `<tr class="${hasDiff ? 'field-diff' : ''}">`;
-        html += `<td><strong>${field}</strong></td>`;
-
-        sheetNames.forEach(sheet => {
-            const val = values[sheet];
-            const displayVal = val || '<span class="empty">空</span>';
-            html += `<td class="${hasDiff && val ? 'highlight-diff' : ''}">${displayVal}</td>`;
+        sheet_names.forEach(sheet => {
+            const record = person._sheets[sheet];
+            row.push(record ? record['身份证'] || '' : '');
         });
-
-        html += '</tr>';
-    });
-
-    html += '</tbody></table>';
-    return html;
-}
-
-function exportCurrentView() {
-    let dataToExport = currentComparisonTab === 'complete' ?
-        comparisonResults.complete_groups : comparisonResults.incomplete_groups;
-
-    const standardFields = getStandardFields();
-    const sheetNames = comparisonResults.sheet_names || [];
-
-    const rows = [['姓名', ...standardFields.filter(f => f !== '姓名'), '完善度', '差异字段数', ...sheetNames]];
-
-    dataToExport.forEach(group => {
-        const row = [
-            group['姓名'] || '',
-            ...standardFields.filter(f => f !== '姓名').map(f => group[f] || ''),
-            Math.round(group._completeness / 9 * 100) + '%',
-            Object.keys(group._field_diffs || {}).length,
-            ...sheetNames.map(sheet => {
-                const record = group._sheet_data[sheet];
-                return record ? '✓' : '-';
-            })
-        ];
+        sheet_names.forEach(sheet => {
+            const record = person._sheets[sheet];
+            row.push(record ? record['残疾证号'] || '' : '');
+        });
+        row.push(person._is_same ? '相同' : '非相同');
         rows.push(row);
     });
 
@@ -640,7 +644,7 @@ function exportCurrentView() {
     const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `比对结果_${currentComparisonTab}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `比对结果_${currentComparisonFilter}_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
 }
 
