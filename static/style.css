@@ -769,6 +769,14 @@ select:focus {
     background: #fff3cd;
 }
 
+.comparison-table tbody tr.complete {
+    background: #d4edda;
+}
+
+.comparison-table tbody tr.incomplete {
+    background: #f8d7da;
+}
+
 /* Toast */
 .toast {
     position: fixed;

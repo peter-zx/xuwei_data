@@ -281,6 +281,117 @@ def get_columns():
         return jsonify({'error': f'获取列名失败: {str(e)}'}), 500
 
 
+@app.route('/api/compare', methods=['POST'])
+def compare_data():
+    """数据比对：基于5个关键字段判断相似，按数据完整性分组"""
+    try:
+        data = request.json
+        filename = data.get('filename')
+        mappings = data.get('mappings', {})
+
+        if not filename:
+            return jsonify({'error': '未提供文件名'}), 400
+
+        filepath = os.path.join(app.config['CACHE_FOLDER'], filename)
+        if not os.path.exists(filepath):
+            return jsonify({'error': '文件不存在'}), 404
+
+        # 先获取映射后的数据
+        excel_data = pd.ExcelFile(filepath)
+        all_records = []
+
+        for sheet_name in excel_data.sheet_names:
+            sheet_mapping = mappings.get(sheet_name, {})
+            header_row = sheet_mapping.get('header_row', 0)
+            field_mapping = sheet_mapping.get('fields', {})
+
+            if field_mapping is None:
+                field_mapping = {}
+
+            df = pd.read_excel(filepath, sheet_name=sheet_name, header=header_row)
+
+            for idx, row in df.iterrows():
+                record = {'sheet_name': sheet_name, 'row_index': idx}
+
+                for field in get_standard_fields():
+                    col_name = field_mapping.get(field)
+                    if col_name and col_name.strip() and col_name in df.columns:
+                        value = str(row[col_name]) if pd.notna(row[col_name]) else ''
+                        record[field] = value
+                    else:
+                        record[field] = ''
+
+                all_records.append(record)
+
+        # 定义关键字段
+        key_fields = ['姓名', '身份证', '残疾证号', '残疾证类型', '残疾证等级']
+
+        # 构建相似度分组
+        groups = {}  # key -> {records: [], is_complete: bool}
+
+        for record in all_records:
+            # 生成相似度键（5个关键字段的组合）
+            key_tuple = tuple(record.get(field, '') for field in key_fields)
+            key_str = '|'.join(key_tuple)
+
+            if key_str not in groups:
+                groups[key_str] = {'records': [], 'is_complete': False}
+
+            groups[key_str]['records'].append(record)
+
+            # 判断是否完善（9个字段中≥7个非空）
+            non_empty_count = sum(1 for k, v in record.items() if k not in ['sheet_name', 'row_index'] and v and v.strip())
+            groups[key_str]['is_complete'] = non_empty_count >= 7
+
+        # 分类并排序
+        complete_groups = []
+        incomplete_groups = []
+
+        for key, group_data in groups.items():
+            # 合并多条记录（取第一个非空值）
+            merged = {}
+
+            # 计算相似度（基于5个关键字段的非空匹配数）
+            key_match_count = sum(1 for field in key_fields if any(
+                r.get(field) and r.get(field).strip() for r in group_data['records']
+            ))
+
+            # 合并数据
+            for field in get_standard_fields():
+                values = [r.get(field, '') for r in group_data['records'] if r.get(field) and r.get(field).strip()]
+                merged[field] = values[0] if values else ''
+
+            merged['_key_match_count'] = key_match_count
+            merged['_records'] = group_data['records']  # 保留原始记录用于详情查看
+            merged['_is_complete'] = group_data['is_complete']
+
+            # 分类
+            if group_data['is_complete']:
+                complete_groups.append(merged)
+            else:
+                incomplete_groups.append(merged)
+
+        # 排序：按姓名字母顺序
+        complete_groups.sort(key=lambda x: x.get('姓名', ''))
+        incomplete_groups.sort(key=lambda x: x.get('姓名', ''))
+
+        return jsonify({
+            'success': True,
+            'complete_groups': complete_groups,
+            'incomplete_groups': incomplete_groups,
+            'stats': {
+                'total_groups': len(complete_groups) + len(incomplete_groups),
+                'complete_count': len(complete_groups),
+                'incomplete_count': len(incomplete_groups)
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'比对失败: {str(e)}'}), 500
+
+
 if __name__ == '__main__':
     # 启动缓存清理任务
     start_cleanup_scheduler()

@@ -506,8 +506,8 @@ if (backToMappingBtn) {
 // 环节4: 进入数据比对
 const toComparisonBtn = document.getElementById('toComparisonBtn');
 if (toComparisonBtn) {
-    toComparisonBtn.addEventListener('click', () => {
-        performDataComparison();
+    toComparisonBtn.addEventListener('click', async () => {
+        await performDataComparison();
         updateStep(5);
     });
 }
@@ -549,80 +549,31 @@ if (resetBtn) {
 }
 
 // 执行数据比对
-function performDataComparison() {
-    if (!mappedResults || mappedResults.length < 2) {
-        showToast('需要至少2个Sheet的数据进行比对', 'error');
-        return;
-    }
-
-    comparisonResults = [];
-    const resultSheets = mappedResults.filter(r => r.success && r.data && r.data.length > 0);
-
-    if (resultSheets.length < 2) {
-        showToast('有效数据Sheet不足2个，无法比对', 'error');
-        return;
-    }
-
-    // 构建人员字典 (姓名 + 残疾证号)
-    const peopleDict = {};
-
-    // 遍历所有Sheet的数据
-    resultSheets.forEach((sheetResult, sheetIndex) => {
-        const sheetName = sheetResult.name;
-
-        sheetResult.data.forEach(record => {
-            const key = getPersonKey(record);
-            const standardFields = getStandardFields();
-
-            if (key) {
-                if (!peopleDict[key]) {
-                    peopleDict[key] = {
-                        key: key,
-                        sheets: {},
-                        matchCount: 0
-                    };
-                }
-                peopleDict[key].sheets[sheetName] = record;
-                peopleDict[key].matchCount++;
-
-                // 添加缺失字段
-                standardFields.forEach(field => {
-                    if (!peopleDict[key][field]) {
-                        peopleDict[key][field] = record[field] || '';
-                    }
-                });
-            }
+async function performDataComparison() {
+    try {
+        const response = await fetch('/api/compare', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filename: uploadedFile,
+                mappings: mappings
+            })
         });
-    });
 
-    // 转换为数组并标记匹配状态
-    Object.values(peopleDict).forEach(person => {
-        const isMatched = person.matchCount === resultSheets.length;
-        comparisonResults.push({
-            ...person,
-            status: isMatched ? 'matched' : 'unmatched',
-            statusText: isMatched ? '相同人' : '非相同人'
-        });
-    });
+        const data = await response.json();
 
-    // 排序：相同人在前
-    comparisonResults.sort((a, b) => {
-        if (a.status === b.status) {
-            return a.key.localeCompare(b.key);
+        if (data.success) {
+            comparisonResults = data;
+            renderComparisonInterface();
+            showToast('比对完成');
+        } else {
+            console.error('比对失败:', data.error);
+            showToast(data.error, 'error');
         }
-        return a.status === 'matched' ? -1 : 1;
-    });
-
-    renderComparisonInterface();
-}
-
-function getPersonKey(record) {
-    const name = record['姓名'] || '';
-    const disabilityCard = record['残疾证'] || '';
-    if (name && disabilityCard) {
-        return `${name}_${disabilityCard}`;
+    } catch (error) {
+        console.error('比对请求失败:', error);
+        showToast('比对失败，请重试', 'error');
     }
-    return null;
 }
 
 // 渲染比对界面
@@ -632,89 +583,95 @@ function renderComparisonInterface() {
         return;
     }
 
-    // 统计
-    const total = comparisonResults.length;
-    const matched = comparisonResults.filter(p => p.status === 'matched').length;
-    const unmatched = comparisonResults.filter(p => p.status === 'unmatched').length;
+    const { stats, complete_groups, incomplete_groups } = comparisonResults;
 
+    // 显示统计
     document.getElementById('comparisonSummary').innerHTML = `
         <div class="summary-item">
             <h4>总人数</h4>
-            <div class="value">${total}</div>
+            <div class="value">${stats.total_groups}</div>
         </div>
         <div class="summary-item">
-            <h4>相同人</h4>
-            <div class="value" style="color: #28a745">${matched}</div>
+            <h4>完善数据</h4>
+            <div class="value" style="color: #28a745">${stats.complete_count}</div>
         </div>
         <div class="summary-item">
-            <h4>非相同人</h4>
-            <div class="value" style="color: #dc3545">${unmatched}</div>
+            <h4>不完善数据</h4>
+            <div class="value" style="color: #dc3545">${stats.incomplete_count}</div>
         </div>
     `;
 
     // 渲染Tab
-    const sheetNames = mappedResults.filter(r => r.success).map(r => r.name);
-    document.getElementById('comparisonTabs').innerHTML = sheetNames.map((name, index) => `
-        <button class="comparison-tab ${index === 0 ? 'active' : ''}" data-index="${index}">
-            ${name}
-        </button>
-    `).join('');
+    document.getElementById('comparisonTabs').innerHTML = `
+        <button class="comparison-tab active" data-type="complete">完善数据 (${stats.complete_count})</button>
+        <button class="comparison-tab" data-type="incomplete">不完善数据 (${stats.incomplete_count})</button>
+    `;
 
     // 绑定Tab事件
     document.querySelectorAll('.comparison-tab').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.comparison-tab').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            currentComparisonTab = parseInt(e.target.dataset.index);
+            currentComparisonTab = e.target.dataset.type;
             renderComparisonTable();
         });
     });
 
-    // 绑定筛选按钮
-    document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            currentComparisonFilter = e.target.dataset.filter;
-            renderComparisonTable();
-        });
-    });
-
-    // 绑定导出按钮
-    document.getElementById('exportBtn').addEventListener('click', exportComparisonData);
-
+    currentComparisonTab = 'complete';
     renderComparisonTable();
 }
 
-function renderComparisonTable() {
-    const sheetName = mappedResults.filter(r => r.success)[currentComparisonTab].name;
+// 导出比对数据
+function exportComparisonData() {
+    if (!comparisonResults) return;
+
     const standardFields = getStandardFields();
+    const rows = [['状态', '姓名', ...standardFields.filter(f => f !== '姓名')]];
 
-    let filteredData = comparisonResults;
+    comparisonResults.complete_groups.forEach(group => {
+        rows.push(['完善', ...standardFields.map(field => group[field] || '')]);
+    });
 
-    if (currentComparisonFilter !== 'all') {
-        filteredData = comparisonResults.filter(p => p.status === currentComparisonFilter);
+    comparisonResults.incomplete_groups.forEach(group => {
+        rows.push(['不完善', ...standardFields.map(field => group[field] || '')]);
+    });
+
+    const csvContent = rows.map(row => row.join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `数据比对结果_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+}
+
+function renderComparisonTable() {
+    const standardFields = getStandardFields();
+    let dataToRender = currentComparisonTab === 'complete' ? comparisonResults.complete_groups : comparisonResults.incomplete_groups;
+
+    if (!dataToRender || dataToRender.length === 0) {
+        document.getElementById('comparisonContent').innerHTML = '<p>暂无数据</p>';
+        return;
     }
 
     const tableHtml = `
         <table class="comparison-table">
             <thead>
                 <tr>
-                    <th>状态</th>
-                    <th>${sheetName}</th>
-                    ${mappedResults.filter(r => r.success).map(r => r.name).filter(n => n !== sheetName).map(name => `<th>${name}</th>`).join('')}
+                    <th>姓名</th>
+                    ${standardFields.filter(f => f !== '姓名').map(field => `<th>${field}</th>`).join('')}
+                    <th>来源</th>
                 </tr>
             </thead>
             <tbody>
-                ${filteredData.map(person => `
-                    <tr class="${person.status}">
-                        <td>${person.statusText}</td>
-                        ${mappedResults.filter(r => r.success).map(r => r.name).map(name => {
-                            const record = person.sheets[name];
-                            return record ? `<td>${record['姓名'] || '-'}</td>` : '<td>-</td>';
-                        }).join('')}
-                    </tr>
-                `).join('')}
+                ${dataToRender.map(group => {
+                    const sources = group._records.map(r => r.sheet_name).join(', ');
+                    return `
+                        <tr class="${group._is_complete ? 'complete' : 'incomplete'}">
+                            ${standardFields.map(field => `<td>${group[field] || '-'}</td>`).join('')}
+                            <td><small>${sources}</small></td>
+                        </tr>
+                    `;
+                }).join('')}
             </tbody>
         </table>
     `;
@@ -751,87 +708,70 @@ function exportComparisonData() {
 
 // 渲染最终结果
 function renderFinalResults() {
-    if (!mappedResults) return;
+    if (!comparisonResults) return;
 
-    const totalSheets = mappedResults.length;
-    const totalRecords = mappedResults.reduce((sum, r) => sum + (r.record_count || 0), 0);
-    const successCount = mappedResults.filter(r => r.success).length;
+    const { stats, complete_groups, incomplete_groups } = comparisonResults;
 
     document.getElementById('finalStats').innerHTML = `
         <div class="stat-card">
-            <h3>总Sheet数</h3>
-            <div class="value">${totalSheets}</div>
-        </div>
-        <div class="stat-card">
-            <h3>总记录数</h3>
-            <div class="value">${totalRecords}</div>
-        </div>
-        <div class="stat-card">
             <h3>总人数</h3>
-            <div class="value">${comparisonResults ? comparisonResults.length : 0}</div>
+            <div class="value">${stats.total_groups}</div>
         </div>
         <div class="stat-card">
-            <h3>相同人</h3>
-            <div class="value">${comparisonResults ? comparisonResults.filter(p => p.status === 'matched').length : 0}</div>
+            <h3>完善数据</h3>
+            <div class="value">${stats.complete_count}</div>
+        </div>
+        <div class="stat-card">
+            <h3>不完善数据</h3>
+            <div class="value">${stats.incomplete_count}</div>
         </div>
     `;
 
-    document.getElementById('finalTabs').innerHTML = mappedResults.map((result, index) => `
-        <button class="tab-btn ${index === 0 ? 'active' : ''}" data-index="${index}">
-            ${result.name} (${result.record_count || 0}条)
-        </button>
-    `).join('');
+    document.getElementById('finalTabs').innerHTML = `
+        <button class="tab-btn active" data-type="complete">完善数据 (${stats.complete_count})</button>
+        <button class="tab-btn" data-type="incomplete">不完善数据 (${stats.incomplete_count})</button>
+    `;
 
     document.querySelectorAll('#finalTabs .tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('#finalTabs .tab-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
-            showFinalResultPanel(parseInt(e.target.dataset.index));
+            currentFinalTab = e.target.dataset.type;
+            showFinalResultPanel();
         });
     });
 
-    showFinalResultPanel(0);
+    currentFinalTab = 'complete';
+    showFinalResultPanel();
 }
 
-function showFinalResultPanel(index) {
-    const result = mappedResults[index];
-    if (!result) {
+let currentFinalTab = 'complete';
+
+function showFinalResultPanel() {
+    const standardFields = getStandardFields();
+    let dataToRender = currentFinalTab === 'complete' ? comparisonResults.complete_groups : comparisonResults.incomplete_groups;
+
+    if (!dataToRender || dataToRender.length === 0) {
         document.getElementById('finalContent').innerHTML = '<p>暂无数据</p>';
         return;
     }
 
-    const { mapping, data, success, error } = result;
-
-    let html = '';
-
-    if (!success) {
-        html = `<div class="error-message">处理失败: ${error}</div>`;
-    } else if (data.length === 0) {
-        html = '<div class="no-data-message">没有提取到数据，请检查映射配置</div>';
-    } else {
-        html += `
-            <div class="mapping-info">
-                <h4>映射关系</h4>
-                ${Object.entries(mapping).map(([field, col]) => `
-                    <span class="mapping-item">${field} ← ${col}</span>
-                `).join('')}
-            </div>
-            <table class="result-table">
-                <thead>
-                    <tr>
-                        ${getStandardFields().map(field => `<th>${field}</th>`).join('')}
+    const html = `
+        <table class="result-table">
+            <thead>
+                <tr>
+                    ${standardFields.map(field => `<th>${field}</th>`).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${dataToRender.map(group => `
+                    <tr class="${group._is_complete ? 'complete' : 'incomplete'}">
+                        ${standardFields.map(field => `<td>${group[field] || '-'}</td>`).join('')}
                     </tr>
-                </thead>
-                <tbody>
-                    ${data.map(row => `
-                        <tr>
-                            ${getStandardFields().map(field => `<td>${row[field] || ''}</td>`).join('')}
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    }
+                `).join('')}
+            </tbody>
+        </table>
+    `;
 
     document.getElementById('finalContent').innerHTML = html;
 }
