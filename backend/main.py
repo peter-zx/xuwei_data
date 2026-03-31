@@ -145,7 +145,7 @@ def get_default_html():
             <div id="stats" class="stats hidden">
                 <div class="stat">
                     <div class="stat-value" id="totalFiles">0</div>
-                    <div class="stat-label">Total Files</div>
+                    <div class="stat-label">Files</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="totalSize">0</div>

@@ -38,8 +38,10 @@ class Doc2PdfConverter:
                 shutil.copy(file_path, output_path)
                 return ConversionResult(True, file_path, str(output_path))
             
-            if ext in ['.docx', '.doc']:
+            if ext in ['.docx']:
                 result = self._convert_word(file_path, output_path)
+            elif ext == '.doc':
+                result = self._convert_doc_old(file_path, output_path)
             elif ext in ['.xlsx', '.xls']:
                 result = self._convert_excel(file_path, output_path)
             elif ext in ['.pptx', '.ppt']:
@@ -98,6 +100,46 @@ class Doc2PdfConverter:
             
         except Exception as e:
             return ConversionResult(False, input_path, error=f"Word conversion failed: {str(e)}")
+    
+    def _convert_doc_old(self, input_path: str, output_path: Path) -> ConversionResult:
+        import subprocess
+        import shutil
+        
+        libreoffice_path = shutil.which('libreoffice') or shutil.which('soffice')
+        
+        if not libreoffice_path:
+            return ConversionResult(
+                False, 
+                input_path, 
+                error=".doc format not supported. Please save as .docx or install LibreOffice."
+            )
+        
+        try:
+            input_dir = str(Path(input_path).parent)
+            input_file = str(Path(input_path).name)
+            output_file = str(output_path.with_suffix(''))
+            
+            cmd = [
+                libreoffice_path,
+                '--headless',
+                '--convert-to', 'pdf',
+                '--outdir', input_dir,
+                input_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            
+            generated_pdf = Path(input_dir) / f"{Path(input_path).stem}.pdf"
+            if generated_pdf.exists():
+                generated_pdf.rename(output_path)
+                return ConversionResult(True, input_path, str(output_path))
+            else:
+                return ConversionResult(False, input_path, error="LibreOffice conversion failed")
+                
+        except subprocess.TimeoutExpired:
+            return ConversionResult(False, input_path, error="Conversion timeout")
+        except Exception as e:
+            return ConversionResult(False, input_path, error=str(e))
     
     def _convert_excel(self, input_path: str, output_path: Path) -> ConversionResult:
         try:

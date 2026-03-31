@@ -1,29 +1,16 @@
 from pathlib import Path
 from typing import List, Dict, Optional
-from dataclasses import dataclass
 import os
 
 
-@dataclass
 class FileNode:
-    name: str
-    path: str
-    is_folder: bool
-    size: int
-    children: List['FileNode']
-    selected: bool = False
-    extension: str = ""
-    
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "path": self.path,
-            "is_folder": self.is_folder,
-            "size": self.size,
-            "extension": self.extension,
-            "selected": self.selected,
-            "children": [c.to_dict() for c in self.children]
-        }
+    def __init__(self, name: str, path: str, is_folder: bool, size: int = 0, children: List['FileNode'] = None):
+        self.name = name
+        self.path = path
+        self.is_folder = is_folder
+        self.size = size
+        self.children = children or []
+        self.extension = "" if is_folder else Path(path).suffix.lower()
 
 
 class FileScanner:
@@ -75,7 +62,6 @@ class FileScanner:
                         is_folder=False,
                         size=size,
                         children=[],
-                        extension=ext
                     )
                     node.children.append(file_node)
                     node.size += size
@@ -93,35 +79,41 @@ class FileScanner:
             files.extend(self.get_all_files(child))
         return files
     
-    def get_file_tree_html(self, node: FileNode, level: int = 0) -> str:
+    def get_file_tree_html(self, node: FileNode) -> str:
+        html = '<ul class="file-tree" style="list-style:none; margin:0; padding:0;">'
+        html += self._render_node(node, 0)
+        html += '</ul>'
+        return html
+    
+    def _render_node(self, node: FileNode, level: int) -> str:
         html = ""
         
         if node.is_folder:
             for child in node.children:
-                html += self.get_file_tree_html(child, level + 1)
+                html += self._render_node(child, level)
         else:
             icon = self._get_file_icon(node.extension)
             size_str = self._format_size(node.size)
-            html += f'<li class="file-item" data-path="{node.path}">'
-            html += f'<input type="checkbox" data-path="{node.path}">'
-            html += f'<span class="file-info">'
-            html += f'<span class="file-icon">{icon}</span>'
-            html += f'<span class="file-name">{node.name}</span>'
-            html += f'<span class="file-size">{size_str}</span>'
+            html += f'<li style="padding:6px 8px; border-radius:6px; margin-bottom:2px; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'transparent\'">'
+            html += f'<input type="checkbox" data-path="{node.path}" style="width:16px; height:16px; cursor:pointer;">'
+            html += f'<span style="flex:1; display:flex; align-items:center; gap:6px;">'
+            html += f'<span>{icon}</span>'
+            html += f'<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{node.name}</span>'
             html += f'</span>'
-            html += f'</li>\n'
+            html += f'<span style="color:#9ca3af; font-size:0.85rem; white-space:nowrap;">{size_str}</span>'
+            html += f'</li>'
         
         return html
     
     def _get_file_icon(self, ext: str) -> str:
         icons = {
-            '.docx': '📄', '.doc': '📄',
-            '.xlsx': '📊', '.xls': '📊',
-            '.pptx': '📽️', '.ppt': '📽️',
-            '.txt': '📝',
-            '.pdf': '📕'
+            '.docx': 'DOCX', '.doc': 'DOC',
+            '.xlsx': 'XLSX', '.xls': 'XLS',
+            '.pptx': 'PPTX', '.ppt': 'PPT',
+            '.txt': 'TXT',
+            '.pdf': 'PDF'
         }
-        return icons.get(ext, '📁')
+        return icons.get(ext, 'FILE')
     
     def _format_size(self, size: int) -> str:
         for unit in ['B', 'KB', 'MB', 'GB']:
