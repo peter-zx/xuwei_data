@@ -253,24 +253,32 @@ def get_default_html():
         
         function toggleFolder(checkbox) {
             const files = checkbox.dataset.files;
-            if (!files) return;
+            console.log('toggleFolder called, files:', files);
+            if (!files) {
+                console.log('No files in dataset');
+                return;
+            }
             
             const fileList = files.split('|');
+            console.log('File list:', fileList);
             const isChecked = checkbox.checked;
             
+            let checkedCount = 0;
             fileList.forEach(path => {
                 const cb = document.querySelector(`.file-checkbox[data-path="${path}"]`);
                 if (cb) {
                     cb.checked = isChecked;
+                    checkedCount++;
                 }
             });
+            console.log('Checked:', checkedCount, 'files');
             
             updateSelection();
         }
         
         function updateSelection() {
             selectedFiles.clear();
-            document.querySelectorAll('input[type="checkbox"][data-path"]:checked').forEach(cb => {
+            document.querySelectorAll('input.file-checkbox[type="checkbox"]:checked').forEach(cb => {
                 if (cb.dataset.path) {
                     selectedFiles.add(cb.dataset.path);
                 }
