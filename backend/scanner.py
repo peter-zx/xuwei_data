@@ -96,27 +96,21 @@ class FileScanner:
     def get_file_tree_html(self, node: FileNode, level: int = 0) -> str:
         html = ""
         indent = "    " * level
-        folder_class = "folder" if node.is_folder else "file"
         
         if node.is_folder:
-            html += f'{indent}<li class="{folder_class}" data-path="{node.path}">\n'
-            html += f'{indent}  <span class="folder-name">📁 {node.name}</span>\n'
-            if node.children:
-                html += f'{indent}  <ul class="nested">\n'
-                for child in node.children:
-                    html += self.get_file_tree_html(child, level + 2)
-                html += f'{indent}  </ul>\n'
-            html += f'{indent}</li>\n'
+            for child in node.children:
+                html += self.get_file_tree_html(child, level + 1)
         else:
             icon = self._get_file_icon(node.extension)
             size_str = self._format_size(node.size)
-            html += f'{indent}<li class="file" data-path="{node.path}" data-size="{node.size}">\n'
-            html += f'{indent}  <span class="file-info">\n'
-            html += f'{indent}    <span class="file-icon">{icon}</span>\n'
-            html += f'{indent}    <span class="file-name">{node.name}</span>\n'
-            html += f'{indent}    <span class="file-size">{size_str}</span>\n'
-            html += f'{indent}  </span>\n'
-            html += f'{indent}</li>\n'
+            html += f'<li data-path="{node.path}">'
+            html += f'<input type="checkbox" data-path="{node.path}">'
+            html += f'<span class="file-info">'
+            html += f'<span class="file-icon">{icon}</span>'
+            html += f'<span class="file-name">{node.name}</span>'
+            html += f'<span class="file-size">{size_str}</span>'
+            html += f'</span>'
+            html += f'</li>\n'
         
         return html
     

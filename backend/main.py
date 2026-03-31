@@ -74,7 +74,7 @@ def get_default_html():
 <html>
 <head>
     <meta charset="utf-8">
-    <title>文档转PDF工具</title>
+    <title>Doc2PDF Tool</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; }
@@ -82,73 +82,84 @@ def get_default_html():
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 16px; margin-bottom: 20px; text-align: center; }
         .header h1 { font-size: 2rem; margin-bottom: 10px; }
         .card { background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-        .input-group { display: flex; gap: 12px; margin-bottom: 20px; }
-        .input-group input { flex: 1; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 1rem; }
-        .btn { padding: 14px 28px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .input-group { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+        .input-group input { flex: 1; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 0.95rem; }
+        .input-group input:focus { border-color: #667eea; outline: none; }
+        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
         .btn-success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
-        .file-tree { background: #f9fafb; border-radius: 12px; padding: 16px; max-height: 400px; overflow-y: auto; }
-        .file-item { display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: background 0.2s; }
-        .file-item:hover { background: #e5e7eb; }
-        .file-item input[type="checkbox"] { width: 18px; height: 18px; margin-right: 12px; cursor: pointer; }
-        .file-icon { margin-right: 8px; }
-        .file-name { flex: 1; }
-        .file-size { color: #9ca3af; font-size: 0.85rem; }
-        .folder { font-weight: 600; color: #374151; }
-        .stats { display: flex; gap: 20px; margin-top: 16px; padding: 16px; background: #f3f4f6; border-radius: 12px; }
-        .stat { text-align: center; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(17, 153, 142, 0.4); }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #5b6270; }
+        .file-tree { background: #f9fafb; border-radius: 12px; padding: 16px; max-height: 450px; overflow-y: auto; }
+        .file-list { list-style: none; }
+        .file-list li { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+        .file-list li:hover { background: #e5e7eb; }
+        .file-list li.folder { font-weight: 600; color: #374151; margin-bottom: 8px; }
+        .file-list li input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; flex-shrink: 0; }
+        .file-info { flex: 1; display: flex; justify-content: space-between; align-items: center; min-width: 0; }
+        .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-size { color: #9ca3af; font-size: 0.85rem; margin-left: 12px; flex-shrink: 0; }
+        .stats { display: flex; gap: 16px; margin-top: 16px; padding: 16px; background: #f3f4f6; border-radius: 12px; }
+        .stat { flex: 1; text-align: center; padding: 12px; background: white; border-radius: 10px; }
         .stat-value { font-size: 1.5rem; font-weight: 700; color: #667eea; }
-        .stat-label { font-size: 0.85rem; color: #6b7280; }
-        .progress-bar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-top: 16px; }
+        .stat-label { font-size: 0.8rem; color: #6b7280; margin-top: 4px; }
+        .progress-bar { height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; margin-top: 16px; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s; }
-        .result-item { padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+        .result-item { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
         .result-success { background: #d1fae5; color: #10b981; }
         .result-failed { background: #fee2e2; color: #ef4444; }
+        .result-icon { font-size: 1.2rem; }
+        .result-info { flex: 1; }
+        .result-name { font-weight: 600; }
+        .result-path { font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
         .hidden { display: none; }
+        .section-title { font-size: 1.1rem; font-weight: 600; color: #374151; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .hint { font-size: 0.85rem; color: #9ca3af; margin-top: 8px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📄 文档转PDF工具</h1>
-            <p>支持 Word、Excel、PPT、TXT 转 PDF</p>
+            <h1>Doc2PDF</h1>
+            <p>Word/Excel/PPT/TXT to PDF Converter</p>
         </div>
         
         <div class="card">
-            <h3 style="margin-bottom: 16px;">📁 选择文件夹</h3>
+            <div class="section-title">1. Select Source Folder</div>
             <div class="input-group">
-                <input type="text" id="folderPath" placeholder="请输入文件夹路径,例如: C:\\Users\\Documents" value="">
-                <button class="btn btn-primary" onclick="scanFolder()">🔍 扫描</button>
+                <input type="text" id="folderPath" placeholder="C:\\Users\\YourName\\Documents" value="">
+                <button class="btn btn-secondary" onclick="browseFolder()">Browse</button>
+                <button class="btn btn-primary" onclick="scanFolder()">Scan</button>
             </div>
-            
             <div id="fileTree" class="file-tree hidden"></div>
-            
             <div id="stats" class="stats hidden">
                 <div class="stat">
                     <div class="stat-value" id="totalFiles">0</div>
-                    <div class="stat-label">文件数</div>
+                    <div class="stat-label">Total Files</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="totalSize">0</div>
-                    <div class="stat-label">总大小</div>
+                    <div class="stat-label">Total Size</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="selectedFiles">0</div>
-                    <div class="stat-label">已选择</div>
+                    <div class="stat-label">Selected</div>
                 </div>
             </div>
+            <div class="hint" id="hint">Enter folder path or click Browse to select</div>
         </div>
         
         <div class="card">
-            <h3 style="margin-bottom: 16px;">⚙️ 转换设置</h3>
+            <div class="section-title">2. Output Settings</div>
             <div class="input-group">
-                <input type="text" id="outputPath" placeholder="输出目录 (留空则使用默认)" value="">
-                <button class="btn btn-success" id="convertBtn" onclick="startConvert()" disabled>📥 开始转换</button>
+                <input type="text" id="outputPath" placeholder="Default: Desktop" value="">
+                <button class="btn btn-secondary" onclick="browseOutput()">Browse</button>
+                <button class="btn btn-success" id="convertBtn" onclick="startConvert()" disabled>Convert</button>
             </div>
-            
             <div id="progress" class="hidden">
-                <p id="progressText">准备中...</p>
+                <p id="progressText" style="margin-bottom: 8px;">Converting...</p>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressBar" style="width: 0%"></div>
                 </div>
@@ -156,18 +167,42 @@ def get_default_html():
         </div>
         
         <div class="card hidden" id="resultsCard">
-            <h3 style="margin-bottom: 16px;">📊 转换结果</h3>
+            <div class="section-title">3. Results</div>
             <div id="results"></div>
         </div>
     </div>
     
     <script>
         let selectedFiles = new Set();
-        let allFiles = [];
+        
+        async function browseFolder() {
+            try {
+                const response = await fetch('/api/browse-folder');
+                const data = await response.json();
+                if (data.path) {
+                    document.getElementById('folderPath').value = data.path;
+                    scanFolder();
+                }
+            } catch (e) {
+                alert('Browse failed: ' + e.message);
+            }
+        }
+        
+        async function browseOutput() {
+            try {
+                const response = await fetch('/api/browse-output');
+                const data = await response.json();
+                if (data.path) {
+                    document.getElementById('outputPath').value = data.path;
+                }
+            } catch (e) {
+                alert('Browse failed: ' + e.message);
+            }
+        }
         
         async function scanFolder() {
             const folderPath = document.getElementById('folderPath').value.trim();
-            if (!folderPath) { alert('请输入文件夹路径'); return; }
+            if (!folderPath) { alert('Please enter folder path'); return; }
             
             try {
                 const response = await fetch('/api/scan', {
@@ -178,46 +213,50 @@ def get_default_html():
                 const data = await response.json();
                 
                 if (!data.success) {
-                    alert('扫描失败: ' + data.error);
+                    alert('Scan failed: ' + data.error);
                     return;
                 }
                 
-                document.getElementById('fileTree').innerHTML = data.tree_html;
+                document.getElementById('fileTree').innerHTML = '<ul class="file-list">' + data.tree_html + '</ul>';
                 document.getElementById('fileTree').classList.remove('hidden');
                 document.getElementById('stats').classList.remove('hidden');
                 document.getElementById('totalFiles').textContent = data.total_files;
                 document.getElementById('totalSize').textContent = data.total_size;
+                document.getElementById('hint').textContent = 'Click files to select/deselect for conversion';
                 document.getElementById('convertBtn').disabled = false;
                 
-                initTreeInteraction();
+                initCheckboxes();
             } catch (e) {
-                alert('扫描失败: ' + e.message);
+                alert('Scan failed: ' + e.message);
             }
         }
         
-        function initTreeInteraction() {
-            document.querySelectorAll('.file-item').forEach(item => {
-                item.addEventListener('click', function(e) {
-                    if (e.target.type === 'checkbox') return;
-                    const checkbox = this.querySelector('input[type="checkbox"]');
-                    checkbox.checked = !checkbox.checked;
-                    updateSelection();
-                });
+        function initCheckboxes() {
+            document.querySelectorAll('.file-list li').forEach(item => {
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.addEventListener('change', updateSelection);
+                    item.addEventListener('click', function(e) {
+                        if (e.target !== checkbox) {
+                            checkbox.checked = !checkbox.checked;
+                            updateSelection();
+                        }
+                    });
+                }
             });
         }
         
         function updateSelection() {
             selectedFiles.clear();
-            document.querySelectorAll('.file-item input[type="checkbox"]:checked').forEach(cb => {
-                const path = cb.closest('.file-item').dataset.path;
-                selectedFiles.add(path);
+            document.querySelectorAll('.file-list input[type="checkbox"]:checked').forEach(cb => {
+                selectedFiles.add(cb.dataset.path);
             });
             document.getElementById('selectedFiles').textContent = selectedFiles.size;
         }
         
         async function startConvert() {
             if (selectedFiles.size === 0) {
-                alert('请选择要转换的文件');
+                alert('Please select files to convert');
                 return;
             }
             
@@ -241,7 +280,7 @@ def get_default_html():
                 const data = await response.json();
                 showResults(data);
             } catch (e) {
-                alert('转换失败: ' + e.message);
+                alert('Convert failed: ' + e.message);
             } finally {
                 convertBtn.disabled = false;
             }
@@ -253,20 +292,59 @@ def get_default_html():
             
             resultsCard.classList.remove('hidden');
             
-            let html = `<p style="margin-bottom: 16px;">成功: ${data.successful}/${data.total}个文件</p>`;
-            
+            let html = '';
             data.results.forEach(r => {
                 const cls = r.success ? 'result-success' : 'result-failed';
-                const status = r.success ? '✓' : '✗';
-                const msg = r.success ? r.output_path : r.error;
-                html += `<div class="result-item ${cls}">${status} ${r.original_path}<br><small>${msg}</small></div>`;
+                const icon = r.success ? '&#10004;' : '&#10008;';
+                const name = r.original_path.split(/[/\\\\]/).pop();
+                html += '<div class="result-item ' + cls + '">';
+                html += '<span class="result-icon">' + icon + '</span>';
+                html += '<div class="result-info">';
+                html += '<div class="result-name">' + name + '</div>';
+                html += '<div class="result-path">' + (r.success ? r.output_path : r.error) + '</div>';
+                html += '</div></div>';
             });
             
+            html = '<p style="margin-bottom: 12px; font-weight: 600;">Success: ' + data.successful + '/' + data.total + ' files</p>' + html;
             resultsDiv.innerHTML = html;
         }
     </script>
 </body>
 </html>"""
+
+
+@app.get("/api/browse-folder")
+async def browse_folder():
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    
+    folder_path = filedialog.askdirectory(title="Select Folder")
+    root.destroy()
+    
+    if folder_path:
+        return {"path": folder_path}
+    return {"path": ""}
+
+
+@app.get("/api/browse-output")
+async def browse_output():
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    
+    folder_path = filedialog.askdirectory(title="Select Output Folder")
+    root.destroy()
+    
+    if folder_path:
+        return {"path": folder_path}
+    return {"path": ""}
 
 
 @app.post("/api/scan")
@@ -295,7 +373,7 @@ async def scan_folder(request: ScanRequest) -> FileTreeResponse:
 @app.post("/api/convert")
 async def convert_files(request: ConvertRequest) -> ConvertResponse:
     try:
-        output_dir = request.output_dir or str(OUTPUT_DIR / datetime.now().strftime("%Y%m%d_%H%M%S"))
+        output_dir = request.output_dir or str(Path.home() / "Desktop" / "Doc2PDF_Output" / datetime.now().strftime("%Y%m%d_%H%M%S"))
         converter = Doc2PdfConverter(output_dir)
         
         results = converter.convert_batch(request.file_paths)
