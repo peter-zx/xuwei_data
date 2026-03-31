@@ -240,29 +240,49 @@ def get_default_html():
         }
         
         function initCheckboxes() {
-            document.querySelectorAll('.file-list li').forEach(item => {
-                const checkbox = item.querySelector('input[type="checkbox"]');
-                if (checkbox) {
-                    checkbox.addEventListener('change', updateSelection);
-                    item.addEventListener('click', function(e) {
-                        if (e.target !== checkbox) {
-                            checkbox.checked = !checkbox.checked;
-                            updateSelection();
-                        }
-                    });
+            document.querySelectorAll('.file-row input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelection);
+            });
+            
+            document.querySelectorAll('.folder-header input[type="checkbox"]').forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    toggleFolder(this);
+                });
+            });
+        }
+        
+        function toggleFolder(checkbox) {
+            const files = checkbox.dataset.files;
+            if (!files) return;
+            
+            const fileList = files.split('|');
+            const isChecked = checkbox.checked;
+            
+            fileList.forEach(path => {
+                const cb = document.querySelector(`.file-checkbox[data-path="${path}"]`);
+                if (cb) {
+                    cb.checked = isChecked;
                 }
             });
+            
+            updateSelection();
         }
         
         function updateSelection() {
             selectedFiles.clear();
-            document.querySelectorAll('.file-list input[type="checkbox"]:checked').forEach(cb => {
-                selectedFiles.add(cb.dataset.path);
+            document.querySelectorAll('input[type="checkbox"][data-path"]:checked').forEach(cb => {
+                if (cb.dataset.path) {
+                    selectedFiles.add(cb.dataset.path);
+                }
             });
             document.getElementById('selectedFiles').textContent = selectedFiles.size;
         }
         
         async function startConvert() {
+            if (selectedFiles.size === 0) {
+                alert('Please select files to convert');
+                return;
+            }
             if (selectedFiles.size === 0) {
                 alert('Please select files to convert');
                 return;
