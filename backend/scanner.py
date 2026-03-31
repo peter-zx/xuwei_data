@@ -80,30 +80,56 @@ class FileScanner:
         return files
     
     def get_file_tree_html(self, node: FileNode) -> str:
-        html = '<ul class="file-tree" style="list-style:none; margin:0; padding:0;">'
-        html += self._render_node(node, 0)
-        html += '</ul>'
+        html = '<div class="tree-container">'
+        
+        if node.is_folder and node.children:
+            for child in node.children:
+                html += self._render_tree(child, 0)
+        
+        html += '</div>'
         return html
     
-    def _render_node(self, node: FileNode, level: int) -> str:
+    def _render_tree(self, node: FileNode, level: int) -> str:
         html = ""
         
         if node.is_folder:
+            folder_html = f'<div class="folder-header" style="padding:10px 12px; background:#f3f4f6; border-radius:8px; margin-bottom:8px; margin-top:8px;">'
+            folder_html += f'<span style="font-weight:600; color:#374151;">&#128193; {node.name}</span>'
+            folder_html += f'<span style="color:#9ca3af; font-size:0.85rem; margin-left:8px;">({self._count_files(node)} files)</span>'
+            folder_html += f'</div>'
+            
+            files_html = ""
             for child in node.children:
-                html += self._render_node(child, level)
+                if not child.is_folder:
+                    files_html += self._render_file(child)
+                else:
+                    files_html += self._render_tree(child, level + 1)
+            
+            if files_html:
+                html += folder_html
+                html += f'<div style="padding-left:{level * 20}px;">{files_html}</div>'
         else:
-            icon = self._get_file_icon(node.extension)
-            size_str = self._format_size(node.size)
-            html += f'<li style="padding:6px 8px; border-radius:6px; margin-bottom:2px; display:flex; align-items:center; gap:8px;" onmouseover="this.style.background=\'#f3f4f6\'" onmouseout="this.style.background=\'transparent\'">'
-            html += f'<input type="checkbox" data-path="{node.path}" style="width:16px; height:16px; cursor:pointer;">'
-            html += f'<span style="flex:1; display:flex; align-items:center; gap:6px;">'
-            html += f'<span>{icon}</span>'
-            html += f'<span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{node.name}</span>'
-            html += f'</span>'
-            html += f'<span style="color:#9ca3af; font-size:0.85rem; white-space:nowrap;">{size_str}</span>'
-            html += f'</li>'
+            html += self._render_file(node)
         
         return html
+    
+    def _render_file(self, node: FileNode) -> str:
+        icon = self._get_file_icon(node.extension)
+        size_str = self._format_size(node.size)
+        html = f'<div class="file-row" style="display:flex; align-items:center; padding:8px 12px; border-radius:8px; margin-bottom:4px; background:#fafafa;">'
+        html += f'<input type="checkbox" data-path="{node.path}" style="width:18px; height:18px; cursor:pointer; margin-right:12px;">'
+        html += f'<span style="flex:1; display:flex; align-items:center; gap:8px;">'
+        html += f'<span style="background:#667eea; color:white; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600;">{icon}</span>'
+        html += f'<span style="font-weight:500;">{node.name}</span>'
+        html += f'</span>'
+        html += f'<span style="color:#9ca3af; font-size:0.85rem;">{size_str}</span>'
+        html += f'</div>'
+        return html
+    
+    def _count_files(self, node: FileNode) -> int:
+        if not node.is_folder:
+            return 1
+        return sum(self._count_files(child) for child in node.children)
     
     def _get_file_icon(self, ext: str) -> str:
         icons = {

@@ -104,6 +104,14 @@ class Doc2PdfConverter:
     def _convert_doc_old(self, input_path: str, output_path: Path) -> ConversionResult:
         import subprocess
         import shutil
+        import platform
+        
+        system = platform.system()
+        
+        if system == "Windows":
+            result = self._convert_with_wps(input_path, output_path)
+            if result.success:
+                return result
         
         libreoffice_path = shutil.which('libreoffice') or shutil.which('soffice')
         
@@ -111,13 +119,11 @@ class Doc2PdfConverter:
             return ConversionResult(
                 False, 
                 input_path, 
-                error=".doc format not supported. Please save as .docx or install LibreOffice."
+                error=".doc not supported by python-docx. Save as .docx to convert."
             )
         
         try:
             input_dir = str(Path(input_path).parent)
-            input_file = str(Path(input_path).name)
-            output_file = str(output_path.with_suffix(''))
             
             cmd = [
                 libreoffice_path,
@@ -138,6 +144,29 @@ class Doc2PdfConverter:
                 
         except subprocess.TimeoutExpired:
             return ConversionResult(False, input_path, error="Conversion timeout")
+        except Exception as e:
+            return ConversionResult(False, input_path, error=str(e))
+    
+    def _convert_with_wps(self, input_path: str, output_path: Path) -> ConversionResult:
+        try:
+            import win32com.client
+            import pythoncom
+            
+            pythoncom.CoInitialize()
+            
+            wps = win32com.client.Dispatch("WPS.Application")
+            doc = wps.Documents.Open(str(Path(input_path).absolute()), ReadOnly=True)
+            doc.SaveAs(str(output_path), FileFormat=17)
+            doc.Close()
+            wps.Quit()
+            
+            pythoncom.CoUninitialize()
+            
+            if output_path.exists():
+                return ConversionResult(True, input_path, str(output_path))
+            else:
+                return ConversionResult(False, input_path, error="WPS conversion failed")
+                
         except Exception as e:
             return ConversionResult(False, input_path, error=str(e))
     
