@@ -3,7 +3,6 @@ import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional, Callable
 import tempfile
-import zipfile
 import shutil
 
 
@@ -16,9 +15,10 @@ class ConversionResult:
 
 
 class Doc2PdfConverter:
-    def __init__(self, output_dir: str):
+    def __init__(self, output_dir: str, source_root: str = None):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.source_root = Path(source_root) if source_root else None
         self.results: List[ConversionResult] = []
     
     def convert_single(self, file_path: str, progress_callback: Optional[Callable] = None) -> ConversionResult:
@@ -26,7 +26,13 @@ class Doc2PdfConverter:
         ext = path.suffix.lower()
         
         try:
-            output_path = self.output_dir / f"{path.stem}.pdf"
+            if self.source_root:
+                rel_path = Path(file_path).relative_to(self.source_root)
+                output_subdir = self.output_dir / rel_path.parent
+                output_subdir.mkdir(parents=True, exist_ok=True)
+                output_path = output_subdir / f"{path.stem}.pdf"
+            else:
+                output_path = self.output_dir / f"{path.stem}.pdf"
             
             if ext == '.pdf':
                 shutil.copy(file_path, output_path)
@@ -54,156 +60,150 @@ class Doc2PdfConverter:
     def _convert_word(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
             from docx import Document
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
+            from reportlab.lib.units import cm
+            
             doc = Document(input_path)
             
-            with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w', encoding='utf-8') as f:
-                html_content = self._docx_to_html(doc)
-                f.write(html_content)
-                html_path = f.name
+            pdf_doc = SimpleDocTemplate(str(output_path), pagesize=A4, 
+                                        leftMargin=2*cm, rightMargin=2*cm,
+                                        topMargin=2*cm, bottomMargin=2*cm)
+            styles = getSampleStyleSheet()
+            story = []
             
-            try:
-                self._convert_html_to_pdf(html_path, output_path)
-                return ConversionResult(True, input_path, str(output_path))
-            finally:
-                os.unlink(html_path)
+            for para in doc.paragraphs:
+                text = para.text.strip()
+                if text:
+                    if para.style.name.startswith('Heading'):
+                        level = int(para.style.name[-1]) if para.style.name[-1].isdigit() else 1
+                        story.append(Paragraph(text, styles[f'Heading{level}']))
+                    else:
+                        story.append(Paragraph(text, styles['Normal']))
+                    story.append(Spacer(1, 6))
+            
+            for table in doc.tables:
+                table_data = []
+                for row in table.rows:
+                    row_data = [cell.text for cell in row.cells]
+                    table_data.append(row_data)
+                if table_data:
+                    t = Table(table_data)
+                    story.append(t)
+                    story.append(Spacer(1, 12))
+            
+            pdf_doc.build(story)
+            return ConversionResult(True, input_path, str(output_path))
+            
         except Exception as e:
-            return ConversionResult(False, input_path, error=str(e))
-    
-    def _docx_to_html(self, doc) -> str:
-        html_parts = ['<!DOCTYPE html>', '<html>', '<head>',
-                      '<meta charset="utf-8">',
-                      '<style>',
-                      'body { font-family: SimSun, sans-serif; font-size: 12pt; }',
-                      'p { margin: 6pt 0; }',
-                      'table { border-collapse: collapse; width: 100%; }',
-                      'td, th { border: 1px solid #000; padding: 4pt; }',
-                      '</style>', '</head>', '<body>']
-        
-        for para in doc.paragraphs:
-            text = para.text.strip()
-            if text:
-                if para.style.name.startswith('Heading'):
-                    level = int(para.style.name[-1]) if para.style.name[-1].isdigit() else 1
-                    html_parts.append(f'<h{level}>{text}</h{level}>')
-                else:
-                    html_parts.append(f'<p>{text}</p>')
-        
-        for table in doc.tables:
-            html_parts.append('<table>')
-            for row in table.rows:
-                html_parts.append('<tr>')
-                for cell in row.cells:
-                    html_parts.append(f'<td>{cell.text}</td>')
-                html_parts.append('</tr>')
-            html_parts.append('</table>')
-        
-        html_parts.extend(['</body>', '</html>'])
-        return '\n'.join(html_parts)
+            return ConversionResult(False, input_path, error=f"Word conversion failed: {str(e)}")
     
     def _convert_excel(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
             from openpyxl import load_workbook
+            from reportlab.lib.pagesizes import A4, landscape
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Table, Spacer
+            from reportlab.lib.units import cm
             
-            wb = load_workbook(input_path)
-            html_parts = ['<!DOCTYPE html>', '<html>', '<head>',
-                         '<meta charset="utf-8">',
-                         '<style>',
-                         'body { font-family: SimSun, sans-serif; }',
-                         'table { border-collapse: collapse; width: 100%; }',
-                         'td, th { border: 1px solid #000; padding: 4pt; }',
-                         'th { background: #f0f0f0; }',
-                         '</style>', '</head>', '<body>']
+            wb = load_workbook(input_path, data_only=True)
+            
+            pdf_doc = SimpleDocTemplate(str(output_path), pagesize=landscape(A4),
+                                        leftMargin=1*cm, rightMargin=1*cm,
+                                        topMargin=1*cm, bottomMargin=1*cm)
+            styles = getSampleStyleSheet()
+            story = []
             
             for sheet_name in wb.sheetnames:
                 ws = wb[sheet_name]
-                html_parts.append(f'<h2>{sheet_name}</h2>')
-                html_parts.append('<table>')
+                story.append(Paragraph(sheet_name, styles['Heading2']))
                 
-                for row in ws.iter_rows():
-                    html_parts.append('<tr>')
-                    for cell in row:
-                        value = cell.value if cell.value is not None else ''
-                        html_parts.append(f'<td>{value}</td>')
-                    html_parts.append('</tr>')
+                table_data = []
+                max_cols = min(ws.max_column, 10)
                 
-                html_parts.append('</table>')
+                for row in ws.iter_rows(max_row=min(ws.max_row, 50), max_col=max_cols):
+                    row_data = [str(cell.value) if cell.value else '' for cell in row[:max_cols]]
+                    table_data.append(row_data)
+                
+                if table_data:
+                    t = Table(table_data, repeatRows=1)
+                    t.setStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 0), (-1, -1), 8),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ])
+                    story.append(t)
+                story.append(Spacer(1, 20))
             
-            html_parts.extend(['</body>', '</html>'])
+            pdf_doc.build(story)
+            return ConversionResult(True, input_path, str(output_path))
             
-            with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w', encoding='utf-8') as f:
-                f.write('\n'.join(html_parts))
-                html_path = f.name
-            
-            try:
-                self._convert_html_to_pdf(html_path, output_path)
-                return ConversionResult(True, input_path, str(output_path))
-            finally:
-                os.unlink(html_path)
         except Exception as e:
-            return ConversionResult(False, input_path, error=str(e))
+            return ConversionResult(False, input_path, error=f"Excel conversion failed: {str(e)}")
     
     def _convert_ppt(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
             from pptx import Presentation
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+            from reportlab.lib.units import cm
             
             prs = Presentation(input_path)
-            html_parts = ['<!DOCTYPE html>', '<html>', '<head>',
-                         '<meta charset="utf-8">',
-                         '<style>',
-                         'body { font-family: SimSun, sans-serif; }',
-                         '.slide { page-break-after: always; margin-bottom: 20px; }',
-                         'h1 { color: #333; }',
-                         '</style>', '</head>', '<body>']
+            
+            pdf_doc = SimpleDocTemplate(str(output_path), pagesize=A4,
+                                        leftMargin=2*cm, rightMargin=2*cm,
+                                        topMargin=2*cm, bottomMargin=2*cm)
+            styles = getSampleStyleSheet()
+            story = []
             
             for i, slide in enumerate(prs.slides, 1):
-                html_parts.append(f'<div class="slide">')
-                html_parts.append(f'<h1>Slide {i}</h1>')
+                story.append(Paragraph(f"Slide {i}", styles['Heading3']))
                 
                 for shape in slide.shapes:
                     if hasattr(shape, "text") and shape.text.strip():
-                        html_parts.append(f'<p>{shape.text}</p>')
+                        for para in shape.text.split('\n'):
+                            if para.strip():
+                                story.append(Paragraph(para, styles['Normal']))
                 
-                html_parts.append('</div>')
+                story.append(Spacer(1, 20))
             
-            html_parts.extend(['</body>', '</html>'])
+            pdf_doc.build(story)
+            return ConversionResult(True, input_path, str(output_path))
             
-            with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w', encoding='utf-8') as f:
-                f.write('\n'.join(html_parts))
-                html_path = f.name
-            
-            try:
-                self._convert_html_to_pdf(html_path, output_path)
-                return ConversionResult(True, input_path, str(output_path))
-            finally:
-                os.unlink(html_path)
         except Exception as e:
-            return ConversionResult(False, input_path, error=str(e))
+            return ConversionResult(False, input_path, error=f"PPT conversion failed: {str(e)}")
     
     def _convert_txt(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
             with open(input_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            html = f'''<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>body {{ font-family: SimSun; font-size: 12pt; white-space: pre-wrap; }}</style>
-</head><body><p>{content}</p></body></html>'''
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.styles import getSampleStyleSheet
+            from reportlab.platypus import SimpleDocTemplate, Paragraph
+            from reportlab.lib.units import cm
             
-            with tempfile.NamedTemporaryFile(suffix='.html', delete=False, mode='w', encoding='utf-8') as f:
-                f.write(html)
-                html_path = f.name
+            pdf_doc = SimpleDocTemplate(str(output_path), pagesize=A4,
+                                        leftMargin=2*cm, rightMargin=2*cm,
+                                        topMargin=2*cm, bottomMargin=2*cm)
+            styles = getSampleStyleSheet()
+            story = []
             
-            try:
-                self._convert_html_to_pdf(html_path, output_path)
-                return ConversionResult(True, input_path, str(output_path))
-            finally:
-                os.unlink(html_path)
+            for line in content.split('\n'):
+                story.append(Paragraph(line or ' ', styles['Normal']))
+            
+            pdf_doc.build(story)
+            return ConversionResult(True, input_path, str(output_path))
+            
         except Exception as e:
-            return ConversionResult(False, input_path, error=str(e))
-    
-    def _convert_html_to_pdf(self, html_path: str, output_path: Path):
-        import pdfkit
-        pdfkit.from_file(html_path, str(output_path))
+            return ConversionResult(False, input_path, error=f"TXT conversion failed: {str(e)}")
     
     def convert_batch(self, file_paths: List[str], 
                      progress_callback: Optional[Callable[[int, int], None]] = None) -> List[ConversionResult]:
@@ -219,9 +219,3 @@ class Doc2PdfConverter:
                 progress_callback(completed, total)
         
         return results
-    
-    def create_zip(self, output_zip_path: str) -> str:
-        with zipfile.ZipFile(output_zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for file_path in self.output_dir.glob('*.pdf'):
-                zf.write(file_path, file_path.name)
-        return output_zip_path

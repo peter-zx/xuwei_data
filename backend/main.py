@@ -43,6 +43,7 @@ class ScanRequest(BaseModel):
 class ConvertRequest(BaseModel):
     file_paths: List[str]
     output_dir: Optional[str] = None
+    source_root: Optional[str] = None
 
 
 class FileTreeResponse(BaseModel):
@@ -92,6 +93,10 @@ def get_default_html():
         .btn-success:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(17, 153, 142, 0.4); }
         .btn-secondary { background: #6b7280; color: white; }
         .btn-secondary:hover { background: #5b6270; }
+        .drop-zone { width: 100%; min-height: 150px; border: 3px dashed #d1d5db; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: #fafafa; }
+        .drop-zone:hover { border-color: #667eea; background: #f5f5ff; }
+        .drop-zone.dragover { border-color: #667eea; background: #f0f0ff; }
+        .drop-zone-content { text-align: center; }
         .file-tree { background: #f9fafb; border-radius: 12px; padding: 16px; max-height: 450px; overflow-y: auto; }
         .file-list { list-style: none; }
         .file-list li { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
@@ -128,11 +133,14 @@ def get_default_html():
         
         <div class="card">
             <div class="section-title">1. Select Source Folder</div>
-            <div class="input-group">
-                <input type="text" id="folderPath" placeholder="C:\\Users\\YourName\\Documents" value="">
-                <button class="btn btn-secondary" onclick="browseFolder()">Browse</button>
-                <button class="btn btn-primary" onclick="scanFolder()">Scan</button>
+            <div id="dropZone" class="drop-zone" onclick="browseFolder()">
+                <div class="drop-zone-content">
+                    <div style="font-size: 3rem; margin-bottom: 10px;">📁</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: #374151;">Click to Select Folder</div>
+                    <div style="font-size: 0.9rem; color: #9ca3af; margin-top: 8px;">or drag and drop a folder here</div>
+                </div>
             </div>
+            <input type="text" id="folderPath" class="hidden" value="">
             <div id="fileTree" class="file-tree hidden"></div>
             <div id="stats" class="stats hidden">
                 <div class="stat">
@@ -148,7 +156,7 @@ def get_default_html():
                     <div class="stat-label">Selected</div>
                 </div>
             </div>
-            <div class="hint" id="hint">Enter folder path or click Browse to select</div>
+            <div class="hint" id="hint">Click the box above to select a folder</div>
         </div>
         
         <div class="card">
@@ -273,7 +281,8 @@ def get_default_html():
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         file_paths: Array.from(selectedFiles),
-                        output_dir: outputPath || null
+                        output_dir: outputPath || null,
+                        source_root: document.getElementById('folderPath').value
                     })
                 });
                 
@@ -374,7 +383,8 @@ async def scan_folder(request: ScanRequest) -> FileTreeResponse:
 async def convert_files(request: ConvertRequest) -> ConvertResponse:
     try:
         output_dir = request.output_dir or str(Path.home() / "Desktop" / "Doc2PDF_Output" / datetime.now().strftime("%Y%m%d_%H%M%S"))
-        converter = Doc2PdfConverter(output_dir)
+        source_root = request.source_root or None
+        converter = Doc2PdfConverter(output_dir, source_root=source_root)
         
         results = converter.convert_batch(request.file_paths)
         
