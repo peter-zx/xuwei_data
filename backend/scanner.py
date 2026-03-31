@@ -95,7 +95,6 @@ class FileScanner:
     
     def get_file_tree_html(self, node: FileNode, level: int = 0) -> str:
         html = ""
-        indent = "    " * level
         
         if node.is_folder:
             for child in node.children:
@@ -103,7 +102,7 @@ class FileScanner:
         else:
             icon = self._get_file_icon(node.extension)
             size_str = self._format_size(node.size)
-            html += f'<li data-path="{node.path}">'
+            html += f'<li class="file-item" data-path="{node.path}">'
             html += f'<input type="checkbox" data-path="{node.path}">'
             html += f'<span class="file-info">'
             html += f'<span class="file-icon">{icon}</span>'
