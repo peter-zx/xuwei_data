@@ -252,7 +252,7 @@ def get_default_html():
                     
                     document.querySelectorAll('.file-checkbox').forEach(cb => {
                         const filePath = cb.dataset.folders;
-                        if (filePath.startsWith(folderPath)) {
+                        if (filePath === folderPath || filePath.startsWith(folderPath + '|')) {
                             cb.checked = isChecked;
                         }
                     });
@@ -275,7 +275,7 @@ def get_default_html():
         function updateFolderCheckboxes() {
             document.querySelectorAll('.folder-checkbox').forEach(folderCb => {
                 const folderPath = folderCb.dataset.folders;
-                const childFiles = document.querySelectorAll(`.file-checkbox[data-folders^="${folderPath}"]`);
+                const childFiles = document.querySelectorAll(`.file-checkbox[data-folders="${folderPath}"], .file-checkbox[data-folders^="${folderPath}|"]`);
                 const checkedCount = Array.from(childFiles).filter(cb => cb.checked).length;
                 
                 if (childFiles.length > 0 && checkedCount === childFiles.length) {
