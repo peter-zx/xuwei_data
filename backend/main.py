@@ -258,7 +258,6 @@ def get_default_html():
                     });
                 }
                 updateSelection();
-                updateFolderCheckboxes();
             });
         }
         
@@ -270,20 +269,6 @@ def get_default_html():
                 }
             });
             document.getElementById('selectedFiles').textContent = selectedFiles.size;
-        }
-        
-        function updateFolderCheckboxes() {
-            document.querySelectorAll('.folder-checkbox').forEach(folderCb => {
-                const folderPath = folderCb.dataset.folders;
-                const childFiles = document.querySelectorAll(`.file-checkbox[data-folders="${folderPath}"], .file-checkbox[data-folders^="${folderPath}|"]`);
-                const checkedCount = Array.from(childFiles).filter(cb => cb.checked).length;
-                
-                if (childFiles.length > 0 && checkedCount === childFiles.length) {
-                    folderCb.checked = true;
-                } else {
-                    folderCb.checked = false;
-                }
-            });
         }
         
         async function startConvert() {
