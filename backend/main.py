@@ -247,11 +247,12 @@ def get_default_html():
         function initCheckboxes() {
             document.addEventListener('change', function(e) {
                 if (e.target.classList.contains('folder-checkbox')) {
-                    const folder = e.target.dataset.folder;
+                    const folderPath = e.target.dataset.folders;
                     const isChecked = e.target.checked;
                     
                     document.querySelectorAll('.file-checkbox').forEach(cb => {
-                        if (cb.dataset.folder === folder) {
+                        const filePath = cb.dataset.folders;
+                        if (filePath.startsWith(folderPath)) {
                             cb.checked = isChecked;
                         }
                     });
