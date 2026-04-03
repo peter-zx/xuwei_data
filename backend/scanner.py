@@ -100,7 +100,7 @@ class FileScanner:
             folder_html = f'<div class="folder-header" style="padding:10px 12px; background:#f3f4f6; border-radius:8px; margin-bottom:8px; margin-top:8px; display:flex; align-items:center; gap:10px;">'
             folder_html += f'<input type="checkbox" data-folder="{current_folder_id}" data-files="{files_json}" onclick="toggleFolder(this)" style="width:18px; height:18px; cursor:pointer;">'
             folder_html += f'<span style="font-weight:600; color:#374151;">&#128193; {node.name}</span>'
-            folder_html += f'<span style="color:#9ca3af; font-size:0.85rem;">({self._count_files(node)} files)</span>'
+            folder_html += f'<span style="color:#9ca3af; font-size:0.85rem;">({self._count_files(node)} 个文件)</span>'
             folder_html += f'</div>'
             
             files_html = ""

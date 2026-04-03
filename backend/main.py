@@ -127,17 +127,17 @@ def get_default_html():
 <body>
     <div class="container">
         <div class="header">
-            <h1>Doc2PDF</h1>
-            <p>Word/Excel/PPT/TXT to PDF Converter</p>
+            <h1>文档转PDF</h1>
+            <p>支持 Word/Excel/PPT/TXT 转换为 PDF</p>
         </div>
         
         <div class="card">
-            <div class="section-title">1. Select Source Folder</div>
+            <div class="section-title">1. 选择源文件夹</div>
             <div id="dropZone" class="drop-zone" onclick="browseFolder()">
                 <div class="drop-zone-content">
                     <div style="font-size: 3rem; margin-bottom: 10px;">📁</div>
-                    <div style="font-size: 1.1rem; font-weight: 600; color: #374151;">Click to Select Folder</div>
-                    <div style="font-size: 0.9rem; color: #9ca3af; margin-top: 8px;">or drag and drop a folder here</div>
+                    <div style="font-size: 1.1rem; font-weight: 600; color: #374151;">点击选择文件夹</div>
+                    <div style="font-size: 0.9rem; color: #9ca3af; margin-top: 8px;">或拖拽文件夹到此处</div>
                 </div>
             </div>
             <input type="text" id="folderPath" class="hidden" value="">
@@ -145,29 +145,29 @@ def get_default_html():
             <div id="stats" class="stats hidden">
                 <div class="stat">
                     <div class="stat-value" id="totalFiles">0</div>
-                    <div class="stat-label">Files</div>
+                    <div class="stat-label">文件数</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="totalSize">0</div>
-                    <div class="stat-label">Total Size</div>
+                    <div class="stat-label">总大小</div>
                 </div>
                 <div class="stat">
                     <div class="stat-value" id="selectedFiles">0</div>
-                    <div class="stat-label">Selected</div>
+                    <div class="stat-label">已选择</div>
                 </div>
             </div>
-            <div class="hint" id="hint">Click the box above to select a folder</div>
+            <div class="hint" id="hint">点击上方区域选择文件夹</div>
         </div>
         
         <div class="card">
-            <div class="section-title">2. Output Settings</div>
+            <div class="section-title">2. 输出设置</div>
             <div class="input-group">
-                <input type="text" id="outputPath" placeholder="Default: Desktop" value="">
-                <button class="btn btn-secondary" onclick="browseOutput()">Browse</button>
-                <button class="btn btn-success" id="convertBtn" onclick="startConvert()" disabled>Convert</button>
+                <input type="text" id="outputPath" placeholder="默认输出到桌面" value="">
+                <button class="btn btn-secondary" onclick="browseOutput()">浏览</button>
+                <button class="btn btn-success" id="convertBtn" onclick="startConvert()" disabled>开始转换</button>
             </div>
             <div id="progress" class="hidden">
-                <p id="progressText" style="margin-bottom: 8px;">Converting...</p>
+                <p id="progressText" style="margin-bottom: 8px;">转换中...</p>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressBar" style="width: 0%"></div>
                 </div>
@@ -175,7 +175,7 @@ def get_default_html():
         </div>
         
         <div class="card hidden" id="resultsCard">
-            <div class="section-title">3. Results</div>
+            <div class="section-title">3. 转换结果</div>
             <div id="results"></div>
         </div>
     </div>
@@ -192,7 +192,7 @@ def get_default_html():
                     scanFolder();
                 }
             } catch (e) {
-                alert('Browse failed: ' + e.message);
+                alert('选择失败: ' + e.message);
             }
         }
         
@@ -204,13 +204,13 @@ def get_default_html():
                     document.getElementById('outputPath').value = data.path;
                 }
             } catch (e) {
-                alert('Browse failed: ' + e.message);
+                alert('选择失败: ' + e.message);
             }
         }
         
         async function scanFolder() {
             const folderPath = document.getElementById('folderPath').value.trim();
-            if (!folderPath) { alert('Please enter folder path'); return; }
+            if (!folderPath) { alert('请输入文件夹路径'); return; }
             
             try {
                 const response = await fetch('/api/scan', {
@@ -221,7 +221,7 @@ def get_default_html():
                 const data = await response.json();
                 
                 if (!data.success) {
-                    alert('Scan failed: ' + data.error);
+                    alert('扫描失败: ' + data.error);
                     return;
                 }
                 
@@ -230,12 +230,12 @@ def get_default_html():
                 document.getElementById('stats').classList.remove('hidden');
                 document.getElementById('totalFiles').textContent = data.total_files;
                 document.getElementById('totalSize').textContent = data.total_size;
-                document.getElementById('hint').textContent = 'Click files to select/deselect for conversion';
+                document.getElementById('hint').textContent = '点击文件复选框选择要转换的文件';
                 document.getElementById('convertBtn').disabled = false;
                 
                 initCheckboxes();
             } catch (e) {
-                alert('Scan failed: ' + e.message);
+                alert('扫描失败: ' + e.message);
             }
         }
         
@@ -317,7 +317,7 @@ def get_default_html():
                 const data = await response.json();
                 showResults(data);
             } catch (e) {
-                alert('Convert failed: ' + e.message);
+                alert('转换失败: ' + e.message);
             } finally {
                 convertBtn.disabled = false;
             }
@@ -342,7 +342,7 @@ def get_default_html():
                 html += '</div></div>';
             });
             
-            html = '<p style="margin-bottom: 12px; font-weight: 600;">Success: ' + data.successful + '/' + data.total + ' files</p>' + html;
+            html = '<p style="margin-bottom: 12px; font-weight: 600;">成功: ' + data.successful + '/' + data.total + ' 个文件</p>' + html;
             resultsDiv.innerHTML = html;
         }
     </script>
