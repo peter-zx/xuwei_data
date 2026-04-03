@@ -82,9 +82,8 @@ class FileScanner:
     def get_file_tree_html(self, node: FileNode) -> str:
         html = '<div class="tree-container">'
         
-        if node.is_folder and node.children:
-            for child in node.children:
-                html += self._render_tree(child, 0)
+        if node.is_folder:
+            html += self._render_tree(node, 0)
         
         html += '</div>'
         return html

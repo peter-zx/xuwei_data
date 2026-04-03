@@ -182,8 +182,11 @@ def get_default_html():
     
     <script>
         let selectedFiles = new Set();
+        let isProcessing = false;
         
         async function browseFolder() {
+            if (isProcessing) return;
+            isProcessing = true;
             try {
                 const response = await fetch('/api/browse-folder');
                 const data = await response.json();
@@ -193,6 +196,8 @@ def get_default_html():
                 }
             } catch (e) {
                 alert('选择失败: ' + e.message);
+            } finally {
+                setTimeout(() => { isProcessing = false; }, 500);
             }
         }
         
