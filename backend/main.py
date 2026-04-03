@@ -245,37 +245,24 @@ def get_default_html():
         }
         
         function initCheckboxes() {
-            document.querySelectorAll('.file-row input[type="checkbox"]').forEach(checkbox => {
-                checkbox.addEventListener('change', updateSelection);
-            });
-            
-            document.querySelectorAll('.folder-header input[type="checkbox"]').forEach(checkbox => {
-                checkbox.addEventListener('change', function() {
-                    toggleFolder(this);
-                });
-            });
-        }
-        
-        function toggleFolder(checkbox) {
-            const files = checkbox.dataset.files;
-            if (!files) return;
-            
-            const fileList = files.split('|');
-            const isChecked = checkbox.checked;
-            const fileSet = new Set(fileList);
-            
-            document.querySelectorAll('.file-checkbox').forEach(cb => {
-                if (fileSet.has(cb.dataset.path)) {
-                    cb.checked = isChecked;
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('folder-checkbox')) {
+                    const folder = e.target.dataset.folder;
+                    const isChecked = e.target.checked;
+                    
+                    document.querySelectorAll('.file-checkbox').forEach(cb => {
+                        if (cb.dataset.folder === folder) {
+                            cb.checked = isChecked;
+                        }
+                    });
                 }
+                updateSelection();
             });
-            
-            updateSelection();
         }
         
         function updateSelection() {
             selectedFiles.clear();
-            document.querySelectorAll('input.file-checkbox[type="checkbox"]:checked').forEach(cb => {
+            document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
                 if (cb.dataset.path) {
                     selectedFiles.add(cb.dataset.path);
                 }

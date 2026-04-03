@@ -88,48 +88,36 @@ class FileScanner:
         html += '</div>'
         return html
     
-    def _render_tree(self, node: FileNode, level: int, folder_id: str = "") -> str:
+    def _render_tree(self, node: FileNode, level: int, top_folder: str = "") -> str:
         html = ""
         
         if node.is_folder:
-            current_folder_id = f"folder_{node.name.replace(' ', '_')}"
-            folder_files = self._get_all_file_paths(node)
-            files_json = '|'.join(folder_files) if folder_files else ""
+            current_folder = top_folder if top_folder else node.name
             
-            folder_html = f'<div class="folder-header" style="padding:10px 12px; background:#f3f4f6; border-radius:8px; margin-bottom:8px; margin-top:8px; display:flex; align-items:center; gap:10px;">'
-            folder_html += f'<input type="checkbox" data-folder="{current_folder_id}" data-files="{files_json}" onclick="toggleFolder(this)" style="width:18px; height:18px; cursor:pointer;">'
+            for child in node.children:
+                if child.is_folder:
+                    html += self._render_tree(child, level + 1, current_folder)
+                else:
+                    html += self._render_file(child, current_folder)
+            
+            folder_html = f'<div class="folder-header" style="padding:10px 12px; background:#e8e8f0; border-radius:8px; margin-bottom:8px; margin-top:8px; display:flex; align-items:center; gap:10px;">'
+            folder_html += f'<input type="checkbox" class="folder-checkbox" data-folder="{current_folder}" style="width:18px; height:18px; cursor:pointer;">'
             folder_html += f'<span style="font-weight:600; color:#374151;">&#128193; {node.name}</span>'
             folder_html += f'<span style="color:#9ca3af; font-size:0.85rem;">({self._count_files(node)} 个文件)</span>'
             folder_html += f'</div>'
             
-            files_html = ""
-            for child in node.children:
-                if not child.is_folder:
-                    files_html += self._render_file(child)
-                else:
-                    files_html += self._render_tree(child, level + 1, current_folder_id)
-            
-            if files_html:
-                html += folder_html
-                html += f'<div style="padding-left:{level * 20}px;">{files_html}</div>'
-        else:
-            html += self._render_file(node)
+            if html:
+                html = folder_html + f'<div style="padding-left:{level * 20}px;">{html}</div>'
+            else:
+                html = folder_html
         
         return html
     
-    def _get_all_file_paths(self, node: FileNode) -> List[str]:
-        paths = []
-        if not node.is_folder:
-            paths.append(node.path)
-        for child in node.children:
-            paths.extend(self._get_all_file_paths(child))
-        return paths
-    
-    def _render_file(self, node: FileNode) -> str:
+    def _render_file(self, node: FileNode, top_folder: str = "") -> str:
         icon = self._get_file_icon(node.extension)
         size_str = self._format_size(node.size)
         html = f'<div class="file-row" style="display:flex; align-items:center; padding:8px 12px; border-radius:8px; margin-bottom:4px; background:#fafafa;">'
-        html += f'<input type="checkbox" data-path="{node.path}" class="file-checkbox" style="width:18px; height:18px; cursor:pointer; margin-right:12px;">'
+        html += f'<input type="checkbox" data-path="{node.path}" data-folder="{top_folder}" class="file-checkbox" style="width:18px; height:18px; cursor:pointer; margin-right:12px;">'
         html += f'<span style="flex:1; display:flex; align-items:center; gap:8px;">'
         html += f'<span style="background:#667eea; color:white; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600;">{icon}</span>'
         html += f'<span style="font-weight:500;">{node.name}</span>'
