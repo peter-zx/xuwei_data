@@ -258,25 +258,17 @@ def get_default_html():
         
         function toggleFolder(checkbox) {
             const files = checkbox.dataset.files;
-            console.log('toggleFolder called, files:', files);
-            if (!files) {
-                console.log('No files in dataset');
-                return;
-            }
+            if (!files) return;
             
             const fileList = files.split('|');
-            console.log('File list:', fileList);
             const isChecked = checkbox.checked;
+            const fileSet = new Set(fileList);
             
-            let checkedCount = 0;
-            fileList.forEach(path => {
-                const cb = document.querySelector(`.file-checkbox[data-path="${path}"]`);
-                if (cb) {
+            document.querySelectorAll('.file-checkbox').forEach(cb => {
+                if (fileSet.has(cb.dataset.path)) {
                     cb.checked = isChecked;
-                    checkedCount++;
                 }
             });
-            console.log('Checked:', checkedCount, 'files');
             
             updateSelection();
         }
@@ -293,7 +285,7 @@ def get_default_html():
         
         async function startConvert() {
             if (selectedFiles.size === 0) {
-                alert('Please select files to convert');
+                alert('请选择要转换的文件');
                 return;
             }
             if (selectedFiles.size === 0) {
