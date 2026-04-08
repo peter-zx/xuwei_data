@@ -5,6 +5,15 @@ from typing import List, Dict, Optional, Callable
 import tempfile
 import shutil
 
+from docx import Document
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
+from reportlab.lib.units import cm
+from reportlab.lib import colors
+from openpyxl import load_workbook
+from pptx import Presentation
+
 
 class ConversionResult:
     def __init__(self, success: bool, original_path: str, output_path: str = "", error: str = ""):
@@ -62,12 +71,6 @@ class Doc2PdfConverter:
     
     def _convert_word(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
-            from docx import Document
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
-            from reportlab.lib.units import cm
-            
             doc = Document(input_path)
             
             pdf_doc = SimpleDocTemplate(str(output_path), pagesize=A4, 
@@ -178,13 +181,6 @@ class Doc2PdfConverter:
     
     def _convert_excel(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
-            from openpyxl import load_workbook
-            from reportlab.lib.pagesizes import A4, landscape
-            from reportlab.lib import colors
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Table, Spacer
-            from reportlab.lib.units import cm
-            
             wb = load_workbook(input_path, data_only=True)
             
             pdf_doc = SimpleDocTemplate(str(output_path), pagesize=landscape(A4),
@@ -226,12 +222,6 @@ class Doc2PdfConverter:
     
     def _convert_ppt(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
-            from pptx import Presentation
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-            from reportlab.lib.units import cm
-            
             prs = Presentation(input_path)
             
             pdf_doc = SimpleDocTemplate(str(output_path), pagesize=A4,
@@ -261,11 +251,6 @@ class Doc2PdfConverter:
         try:
             with open(input_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Paragraph
-            from reportlab.lib.units import cm
             
             pdf_doc = SimpleDocTemplate(str(output_path), pagesize=A4,
                                         leftMargin=2*cm, rightMargin=2*cm,

@@ -24,6 +24,8 @@ from converters.doc2pdf import Doc2PdfConverter, ConversionResult
 
 app = FastAPI(title="文档转PDF工具")
 
+shutdown_event = threading.Event()
+
 BASE_DIR = Path(__file__).parent.parent
 STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -133,8 +135,16 @@ def get_default_html():
 <body>
     <div class="container">
         <div class="header">
-            <h1>文档转PDF</h1>
-            <p>支持 Word/Excel/PPT/TXT 转换为 PDF</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="text-align: left;">
+                    <h1>文档转PDF</h1>
+                    <p>支持 Word/Excel/PPT/TXT 转换为 PDF</p>
+                </div>
+                <div style="text-align: right;">
+                    <button class="btn btn-secondary" id="langToggle" onclick="toggleLanguage()" style="padding: 8px 16px; font-size: 0.85rem; margin-right: 8px;">EN / 中文</button>
+                    <button class="btn btn-secondary" onclick="exitApp()" style="padding: 8px 16px; font-size: 0.85rem;">退出</button>
+                </div>
+            </div>
         </div>
         
         <div class="card">
@@ -187,8 +197,91 @@ def get_default_html():
     </div>
     
     <script>
+        const i18n = {
+            zh: {
+                title: '文档转PDF',
+                subtitle: '支持 Word/Excel/PPT/TXT 转换为 PDF',
+                step1: '1. 选择源文件夹',
+                dropText: '点击选择文件夹',
+                dropHint: '或拖拽文件夹到此处',
+                hint: '点击上方区域选择文件夹',
+                files: '文件数',
+                totalSize: '总大小',
+                selected: '已选择',
+                clickSelect: '点击文件复选框选择要转换的文件',
+                step2: '2. 输出设置',
+                outputPlaceholder: '默认输出到桌面',
+                browse: '浏览',
+                startConvert: '开始转换',
+                converting: '转换中...',
+                step3: '3. 转换结果',
+                complete: '[完成]',
+                success: '成功',
+                failed: '失败',
+                reason: '原因',
+                selectFilesAlert: '请选择要转换的文件',
+                scanFailed: '扫描失败',
+                convertFailed: '转换失败',
+                selectFailed: '选择失败'
+            },
+            en: {
+                title: 'Doc2PDF Tool',
+                subtitle: 'Convert Word/Excel/PPT/TXT to PDF',
+                step1: '1. Select Source Folder',
+                dropText: 'Click to Select Folder',
+                dropHint: 'or drag and drop folder here',
+                hint: 'Click above to select folder',
+                files: 'Files',
+                totalSize: 'Total Size',
+                selected: 'Selected',
+                clickSelect: 'Click checkbox to select files',
+                step2: '2. Output Settings',
+                outputPlaceholder: 'Default: Output to Desktop',
+                browse: 'Browse',
+                startConvert: 'Start Convert',
+                converting: 'Converting...',
+                step3: '3. Conversion Results',
+                complete: '[Complete]',
+                success: 'Success',
+                failed: 'Failed',
+                reason: 'Reason',
+                selectFilesAlert: 'Please select files to convert',
+                scanFailed: 'Scan failed',
+                convertFailed: 'Conversion failed',
+                selectFailed: 'Selection failed'
+            }
+        };
+        
+        let currentLang = 'zh';
         let selectedFiles = new Set();
         let isProcessing = false;
+        
+        function toggleLanguage() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            applyTranslations();
+        }
+        
+        function t(key) {
+            return i18n[currentLang][key] || key;
+        }
+        
+        function applyTranslations() {
+            document.querySelector('.header h1').textContent = t('title');
+            document.querySelector('.header p').textContent = t('subtitle');
+            document.querySelectorAll('.section-title')[0].textContent = t('step1');
+            document.querySelector('.drop-zone-content div:nth-child(2)').textContent = t('dropText');
+            document.querySelector('.drop-zone-content div:nth-child(3)').textContent = t('dropHint');
+            document.getElementById('hint').textContent = t('hint');
+            document.querySelectorAll('.stat-label')[0].textContent = t('files');
+            document.querySelectorAll('.stat-label')[1].textContent = t('totalSize');
+            document.querySelectorAll('.stat-label')[2].textContent = t('selected');
+            document.querySelectorAll('.section-title')[1].textContent = t('step2');
+            document.getElementById('outputPath').placeholder = t('outputPlaceholder');
+            document.querySelectorAll('.btn.btn-secondary')[1].textContent = t('browse');
+            document.getElementById('convertBtn').textContent = t('startConvert');
+            document.getElementById('progressText').textContent = t('converting');
+            document.querySelectorAll('.section-title')[2].textContent = t('step3');
+        }
         
         async function browseFolder() {
             if (isProcessing) return;
@@ -201,7 +294,7 @@ def get_default_html():
                     scanFolder();
                 }
             } catch (e) {
-                alert('选择失败: ' + e.message);
+                alert(t('selectFailed') + ': ' + e.message);
             } finally {
                 setTimeout(() => { isProcessing = false; }, 500);
             }
@@ -215,13 +308,13 @@ def get_default_html():
                     document.getElementById('outputPath').value = data.path;
                 }
             } catch (e) {
-                alert('选择失败: ' + e.message);
+                alert(t('selectFailed') + ': ' + e.message);
             }
         }
         
         async function scanFolder() {
             const folderPath = document.getElementById('folderPath').value.trim();
-            if (!folderPath) { alert('请输入文件夹路径'); return; }
+            if (!folderPath) { alert(t('selectFailed')); return; }
             
             try {
                 const response = await fetch('/api/scan', {
@@ -232,7 +325,7 @@ def get_default_html():
                 const data = await response.json();
                 
                 if (!data.success) {
-                    alert('扫描失败: ' + data.error);
+                    alert(t('scanFailed') + ': ' + data.error);
                     return;
                 }
                 
@@ -241,12 +334,12 @@ def get_default_html():
                 document.getElementById('stats').classList.remove('hidden');
                 document.getElementById('totalFiles').textContent = data.total_files;
                 document.getElementById('totalSize').textContent = data.total_size;
-                document.getElementById('hint').textContent = '点击文件复选框选择要转换的文件';
+                document.getElementById('hint').textContent = t('clickSelect');
                 document.getElementById('convertBtn').disabled = false;
                 
                 initCheckboxes();
             } catch (e) {
-                alert('扫描失败: ' + e.message);
+                alert(t('scanFailed') + ': ' + e.message);
             }
         }
         
@@ -279,11 +372,7 @@ def get_default_html():
         
         async function startConvert() {
             if (selectedFiles.size === 0) {
-                alert('请选择要转换的文件');
-                return;
-            }
-            if (selectedFiles.size === 0) {
-                alert('Please select files to convert');
+                alert(t('selectFilesAlert'));
                 return;
             }
             
@@ -308,7 +397,7 @@ def get_default_html():
                 const data = await response.json();
                 showResults(data);
             } catch (e) {
-                alert('转换失败: ' + e.message);
+                alert(t('convertFailed') + ': ' + e.message);
             } finally {
                 convertBtn.disabled = false;
             }
@@ -325,7 +414,7 @@ def get_default_html():
             const successCount = data.successful;
             const failedCount = data.failed;
             
-            html += '<div class="log-line ' + (failedCount === 0 ? 'log-success' : 'log-error') + '" style="font-size:1.1rem; font-weight:600; padding:12px; text-align:center;">[完成] 成功: ' + successCount + ', 失败: ' + failedCount + '</div>';
+            html += '<div class="log-line ' + (failedCount === 0 ? 'log-success' : 'log-error') + '" style="font-size:1.1rem; font-weight:600; padding:12px; text-align:center;">' + t('complete') + ' ' + t('success') + ': ' + successCount + ', ' + t('failed') + ': ' + failedCount + '</div>';
             
             const successByFolder = {};
             data.results.forEach(r => {
@@ -338,19 +427,27 @@ def get_default_html():
             });
             
             for (const folder in successByFolder) {
-                html += '<div class="log-line log-success">' + folder + ': ' + successByFolder[folder] + ' 个</div>';
+                html += '<div class="log-line log-success">' + folder + ': ' + successByFolder[folder] + ' ' + (currentLang === 'zh' ? '个' : 'files') + '</div>';
             }
             
             data.results.forEach((r, i) => {
                 if (!r.success) {
-                    html += '<div class="log-line log-error">[失败] ' + r.original_path + '</div>';
-                    html += '<div class="log-line log-error" style="padding-left:20px;">原因: ' + r.error + '</div>';
+                    html += '<div class="log-line log-error">[' + t('failed') + '] ' + r.original_path + '</div>';
+                    html += '<div class="log-line log-error" style="padding-left:20px;">' + t('reason') + ': ' + r.error + '</div>';
                 }
             });
             
             html += '</div>';
             
             resultsDiv.innerHTML = html;
+        }
+        
+        async function exitApp() {
+            if (!confirm(currentLang === 'zh' ? '确定要退出吗？' : 'Are you sure you want to exit?')) return;
+            try {
+                await fetch('/api/shutdown', {method: 'POST'});
+            } catch (e) {}
+            setTimeout(() => { window.close(); }, 500);
         }
     </script>
 </body>
@@ -442,7 +539,15 @@ async def convert_files(request: ConvertRequest) -> ConvertResponse:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/download/{filename}")
+@app.post("/api/shutdown")
+async def shutdown():
+    import os
+    def shutdown_server():
+        import time
+        time.sleep(0.3)
+        os._exit(0)
+    threading.Thread(target=shutdown_server, daemon=True).start()
+    return {"message": "shutting down"}
 async def download_file(filename: str):
     file_path = OUTPUT_DIR / filename
     if not file_path.exists():
@@ -463,5 +568,81 @@ def _format_size(size: int) -> str:
 
 
 if __name__ == "__main__":
+    import threading
+    import time
+    import sys
+    import webbrowser
+    import os
+    
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8503)
+    import logging
+    import logging.config
+    
+    logging_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {"default": {"format": "%(asctime)s - %(message)s"}},
+        "handlers": {"default": {"formatter": "default", "class": "logging.StreamHandler", "stream": "ext://sys.stdout"}},
+        "root": {"level": "INFO", "handlers": ["default"]},
+    }
+    logging.config.dictConfig(logging_config)
+    
+    import tkinter as tk
+    from tkinter import ttk
+    
+    splash = tk.Tk()
+    splash.title("Doc2PDF")
+    splash.geometry("320x140")
+    splash.resizable(False, False)
+    splash.attributes("-topmost", True)
+    
+    screen_w = splash.winfo_screenwidth()
+    screen_h = splash.winfo_screenheight()
+    splash.geometry(f"320x140+{(screen_w-320)//2}+{(screen_h-140)//2}")
+    
+    tk.Label(splash, text="📄 Doc2PDF", font=("微软雅黑", 16, "bold")).pack(pady=15)
+    tk.Label(splash, text="正在启动服务...", font=("微软雅黑", 10)).pack()
+    progress = ttk.Progressbar(splash, mode="indeterminate", length=240)
+    progress.pack(pady=15)
+    progress.start(8)
+    
+    splash.update()
+    
+    server_config = uvicorn.Config(app, host="0.0.0.0", port=8503, log_config=logging_config)
+    server = uvicorn.Server(server_config)
+    
+    def run_server():
+        server.run()
+    
+    server_thread = threading.Thread(target=run_server, daemon=True)
+    server_thread.start()
+    
+    time.sleep(1.5)
+    webbrowser.open('http://localhost:8503')
+    
+    def check_server():
+        import socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('localhost', 8503))
+        sock.close()
+        if result == 0:
+            progress.stop()
+            tk.Label(splash, text="✅ 服务已就绪", font=("微软雅黑", 9), fg="green").pack()
+            splash.update()
+            time.sleep(1)
+            splash.destroy()
+        else:
+            splash.after(500, check_server)
+    
+    splash.after(500, check_server)
+    
+    def on_close():
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        pid = kernel32.GetCurrentProcessId()
+        
+        import subprocess
+        subprocess.run(f'taskkill /PID {pid} /F', shell=True, capture_output=True)
+    
+    splash.protocol("WM_DELETE_WINDOW", on_close)
+    splash.mainloop()
