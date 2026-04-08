@@ -115,11 +115,17 @@ def get_default_html():
         .result-item { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
         .result-success { background: #d1fae5; color: #10b981; }
         .result-failed { background: #fee2e2; color: #ef4444; }
-        .result-icon { font-size: 1.2rem; }
+        .result-icon { font-size: 1rem; margin-right: 8px; }
         .result-info { flex: 1; }
-        .result-name { font-weight: 600; }
-        .result-path { font-size: 0.85rem; opacity: 0.8; margin-top: 2px; }
+        .result-name { font-weight: 500; font-size: 0.9rem; }
+        .result-path { font-size: 0.8rem; opacity: 0.7; margin-top: 2px; }
         .hidden { display: none; }
+        .log-container { background: #1e1e1e; border-radius: 8px; padding: 16px; max-height: 300px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85rem; }
+        .log-line { padding: 4px 0; border-bottom: 1px solid #333; }
+        .log-line:last-child { border-bottom: none; }
+        .log-success { color: #4caf50; }
+        .log-error { color: #f44336; }
+        .log-info { color: #2196f3; }
         .section-title { font-size: 1.1rem; font-weight: 600; color: #374151; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
         .hint { font-size: 0.85rem; color: #9ca3af; margin-top: 8px; }
     </style>
@@ -314,20 +320,21 @@ def get_default_html():
             
             resultsCard.classList.remove('hidden');
             
-            let html = '';
-            data.results.forEach(r => {
-                const cls = r.success ? 'result-success' : 'result-failed';
-                const icon = r.success ? '&#10004;' : '&#10008;';
+            let html = '<div class="log-container">';
+            html += '<div class="log-line log-info">[开始] 共 ' + data.total + ' 个文件</div>';
+            
+            data.results.forEach((r, i) => {
                 const name = r.original_path.split(/[/\\\\]/).pop();
-                html += '<div class="result-item ' + cls + '">';
-                html += '<span class="result-icon">' + icon + '</span>';
-                html += '<div class="result-info">';
-                html += '<div class="result-name">' + name + '</div>';
-                html += '<div class="result-path">' + (r.success ? r.output_path : r.error) + '</div>';
-                html += '</div></div>';
+                if (r.success) {
+                    html += '<div class="log-line log-success">[成功] ' + name + '</div>';
+                } else {
+                    html += '<div class="log-line log-error">[失败] ' + name + ' - ' + r.error + '</div>';
+                }
             });
             
-            html = '<p style="margin-bottom: 12px; font-weight: 600;">成功: ' + data.successful + '/' + data.total + ' 个文件</p>' + html;
+            html += '<div class="log-line log-info">[完成] 成功: ' + data.successful + ', 失败: ' + data.failed + '</div>';
+            html += '</div>';
+            
             resultsDiv.innerHTML = html;
         }
     </script>
