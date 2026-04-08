@@ -149,27 +149,32 @@ class Doc2PdfConverter:
             return ConversionResult(False, input_path, error=str(e))
     
     def _convert_with_wps(self, input_path: str, output_path: Path) -> ConversionResult:
-        try:
-            import win32com.client
-            import pythoncom
-            
-            pythoncom.CoInitialize()
-            
-            wps = win32com.client.Dispatch("WPS.Application")
-            doc = wps.Documents.Open(str(Path(input_path).absolute()), ReadOnly=True)
-            doc.SaveAs(str(output_path), FileFormat=17)
-            doc.Close()
-            wps.Quit()
-            
-            pythoncom.CoUninitialize()
-            
-            if output_path.exists():
-                return ConversionResult(True, input_path, str(output_path))
-            else:
-                return ConversionResult(False, input_path, error="WPS conversion failed")
+        import pythoncom
+        import win32com.client
+        
+        for prog_id in ["WPS.Application", "KSO.Application", "Word.Application"]:
+            try:
+                pythoncom.CoInitialize()
                 
-        except Exception as e:
-            return ConversionResult(False, input_path, error=".doc格式不支持，请将文件另存为.docx格式后重试")
+                app = win32com.client.Dispatch(prog_id)
+                doc = app.Documents.Open(str(Path(input_path).absolute()), ReadOnly=True)
+                doc.SaveAs(str(output_path), FileFormat=17)
+                doc.Close()
+                app.Quit()
+                
+                pythoncom.CoUninitialize()
+                
+                if output_path.exists():
+                    return ConversionResult(True, input_path, str(output_path))
+                    
+            except Exception as e:
+                try:
+                    pythoncom.CoUninitialize()
+                except:
+                    pass
+                continue
+        
+        return ConversionResult(False, input_path, error=".doc转换失败，请安装WPS或Office")
     
     def _convert_excel(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
