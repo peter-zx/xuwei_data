@@ -321,18 +321,32 @@ def get_default_html():
             resultsCard.classList.remove('hidden');
             
             let html = '<div class="log-container">';
-            html += '<div class="log-line log-info">[开始] 共 ' + data.total + ' 个文件</div>';
             
-            data.results.forEach((r, i) => {
-                const name = r.original_path.split(/[/\\\\]/).pop();
+            const successCount = data.successful;
+            const failedCount = data.failed;
+            
+            html += '<div class="log-line ' + (failedCount === 0 ? 'log-success' : 'log-error') + '" style="font-size:1.1rem; font-weight:600; padding:12px; text-align:center;">[完成] 成功: ' + successCount + ', 失败: ' + failedCount + '</div>';
+            
+            const successByFolder = {};
+            data.results.forEach(r => {
                 if (r.success) {
-                    html += '<div class="log-line log-success">[成功] ' + name + '</div>';
-                } else {
-                    html += '<div class="log-line log-error">[失败] ' + name + ' - ' + r.error + '</div>';
+                    const parts = r.original_path.split(/[/\\\\]/);
+                    const folderName = parts.length >= 2 ? parts[parts.length - 2] : 'root';
+                    successByFolder[folderName] = (successByFolder[folderName] || 0) + 1;
                 }
             });
             
-            html += '<div class="log-line log-info">[完成] 成功: ' + data.successful + ', 失败: ' + data.failed + '</div>';
+            for (const folder in successByFolder) {
+                html += '<div class="log-line log-success">' + folder + ': ' + successByFolder[folder] + ' 个文件转换成功</div>';
+            }
+            
+            data.results.forEach((r, i) => {
+                if (!r.success) {
+                    html += '<div class="log-line log-error">[失败] ' + r.original_path + '</div>';
+                    html += '<div class="log-line log-error" style="padding-left:20px;">原因: ' + r.error + '</div>';
+                }
+            });
+            
             html += '</div>';
             
             resultsDiv.innerHTML = html;
