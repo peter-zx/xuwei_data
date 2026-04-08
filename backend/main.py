@@ -331,13 +331,14 @@ def get_default_html():
             data.results.forEach(r => {
                 if (r.success) {
                     const parts = r.original_path.split(/[/\\\\]/);
-                    const folderName = parts.length >= 2 ? parts[parts.length - 2] : 'root';
+                    const last3 = parts.slice(-4, -1);
+                    const folderName = last3.length >= 3 ? last3.join('/') : parts.slice(0, -1).join('/');
                     successByFolder[folderName] = (successByFolder[folderName] || 0) + 1;
                 }
             });
             
             for (const folder in successByFolder) {
-                html += '<div class="log-line log-success">' + folder + ': ' + successByFolder[folder] + ' 个文件转换成功</div>';
+                html += '<div class="log-line log-success">' + folder + ': ' + successByFolder[folder] + ' 个</div>';
             }
             
             data.results.forEach((r, i) => {
