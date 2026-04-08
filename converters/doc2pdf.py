@@ -169,7 +169,7 @@ class Doc2PdfConverter:
                 return ConversionResult(False, input_path, error="WPS conversion failed")
                 
         except Exception as e:
-            return ConversionResult(False, input_path, error=str(e))
+            return ConversionResult(False, input_path, error=".doc格式不支持，请将文件另存为.docx格式后重试")
     
     def _convert_excel(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
