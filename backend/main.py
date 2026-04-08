@@ -402,7 +402,7 @@ async def scan_folder(request: ScanRequest) -> FileTreeResponse:
 @app.post("/api/convert")
 async def convert_files(request: ConvertRequest) -> ConvertResponse:
     try:
-        output_dir = request.output_dir or str(Path.home() / "Desktop" / "Doc2PDF_Output" / datetime.now().strftime("%Y%m%d_%H%M%S"))
+        output_dir = request.output_dir or str(Path.home() / "Desktop" / ("Output_" + datetime.now().strftime("%m%d_%H%M%S")))
         source_root = request.source_root or None
         converter = Doc2PdfConverter(output_dir, source_root=source_root)
         

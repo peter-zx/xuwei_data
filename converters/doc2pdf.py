@@ -27,8 +27,9 @@ class Doc2PdfConverter:
         
         try:
             if self.source_root:
-                rel_path = Path(file_path).relative_to(Path(self.source_root))
-                output_subdir = self.output_dir / rel_path.parent
+                source = Path(self.source_root)
+                rel_path = path.relative_to(source)
+                output_subdir = self.output_dir / source.name / rel_path.parent
                 output_subdir.mkdir(parents=True, exist_ok=True)
                 output_path = output_subdir / f"{path.stem}.pdf"
             else:
