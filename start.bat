@@ -22,8 +22,8 @@ if not exist "venv" (
 
 echo.
 echo Starting service...
-echo Browser will open http://localhost:8501
-echo Press Ctrl+C to stop
+echo Browser will open http://localhost:8503
+echo To exit: click [Exit] button in web interface
 echo.
 
 python backend\main.py
