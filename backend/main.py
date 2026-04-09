@@ -1,4 +1,5 @@
 import sys
+import threading
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
@@ -573,7 +574,40 @@ if __name__ == "__main__":
     import sys
     import webbrowser
     import os
+    import socket
     
+    print("=" * 50)
+    print("Doc2PDF Tool - Document to PDF Converter")
+    print("=" * 50)
+    
+    print("\n[1/4] Checking port 8503...")
+    def check_and_kill_port(port):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        result = sock.connect_ex(('localhost', port))
+        sock.close()
+        if result == 0:
+            print(f"    Port occupied, killing old process...")
+            try:
+                import subprocess
+                result = subprocess.run(f'netstat -ano | findstr :{port}', capture_output=True, text=True, shell=True)
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if 'LISTENING' in line:
+                        parts = line.split()
+                        for i, p in enumerate(parts):
+                            if p.isdigit() and i > 0 and parts[i-1] == 'LISTENING':
+                                pid = int(p)
+                                subprocess.run(f'taskkill /PID {pid} /F', capture_output=True, shell=True)
+                                print(f"    Killed process PID: {pid}")
+                                break
+            except Exception as e:
+                print(f"    Cleanup failed: {e}")
+        else:
+            print("    Port is free")
+    
+    check_and_kill_port(8503)
+    
+    print("\n[2/4] Starting server...")
     import uvicorn
     import logging
     import logging.config
@@ -587,27 +621,6 @@ if __name__ == "__main__":
     }
     logging.config.dictConfig(logging_config)
     
-    import tkinter as tk
-    from tkinter import ttk
-    
-    splash = tk.Tk()
-    splash.title("Doc2PDF")
-    splash.geometry("320x140")
-    splash.resizable(False, False)
-    splash.attributes("-topmost", True)
-    
-    screen_w = splash.winfo_screenwidth()
-    screen_h = splash.winfo_screenheight()
-    splash.geometry(f"320x140+{(screen_w-320)//2}+{(screen_h-140)//2}")
-    
-    tk.Label(splash, text="📄 Doc2PDF", font=("微软雅黑", 16, "bold")).pack(pady=15)
-    tk.Label(splash, text="正在启动服务...", font=("微软雅黑", 10)).pack()
-    progress = ttk.Progressbar(splash, mode="indeterminate", length=240)
-    progress.pack(pady=15)
-    progress.start(8)
-    
-    splash.update()
-    
     server_config = uvicorn.Config(app, host="0.0.0.0", port=8503, log_config=logging_config)
     server = uvicorn.Server(server_config)
     
@@ -617,32 +630,44 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
     
-    time.sleep(1.5)
-    webbrowser.open('http://localhost:8503')
+    print("    Server starting...")
     
-    def check_server():
-        import socket
+    print("\n[3/4] Waiting for server...")
+    for i in range(20):
+        time.sleep(0.3)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex(('localhost', 8503))
         sock.close()
         if result == 0:
-            progress.stop()
-            tk.Label(splash, text="✅ 服务已就绪", font=("微软雅黑", 9), fg="green").pack()
-            splash.update()
-            time.sleep(1)
-            splash.destroy()
-        else:
-            splash.after(500, check_server)
+            print("    [OK] Server ready!")
+            break
+    else:
+        print("    [FAIL] Server failed to start!")
+        sys.exit(1)
     
-    splash.after(500, check_server)
+    print("\n[4/4] Opening browser...")
+    time.sleep(0.5)
+    webbrowser.open('http://localhost:8503')
+    print("    Browser opened!")
     
-    def on_close():
-        import ctypes
-        kernel32 = ctypes.windll.kernel32
-        pid = kernel32.GetCurrentProcessId()
-        
-        import subprocess
-        subprocess.run(f'taskkill /PID {pid} /F', shell=True, capture_output=True)
+    print("\n" + "=" * 50)
+    print("Server started! Visit http://localhost:8503")
+    print("To exit: click [Exit] button in web interface")
+    print("=" * 50)
     
-    splash.protocol("WM_DELETE_WINDOW", on_close)
-    splash.mainloop()
+    def hide_console():
+        time.sleep(3)
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            user32 = ctypes.windll.user32
+            SW_HIDE = 0
+            hwnd = kernel32.GetConsoleWindow()
+            if hwnd:
+                user32.ShowWindow(hwnd, SW_HIDE)
+        except:
+            pass
+    
+    threading.Thread(target=hide_console, daemon=True).start()
+    
+    server_thread.join()
