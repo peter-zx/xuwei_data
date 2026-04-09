@@ -16,7 +16,7 @@
 ### 方式一：直接使用（推荐）
 
 1. 解压压缩包
-2. 双击 `双击启动 文档转PDF.bat`
+2. 进入文件夹，双击 `双击启动 文档转PDF.bat`
 3. 自动启动浏览器，访问 http://localhost:8503
 
 **无需安装任何软件！**
@@ -60,9 +60,16 @@ doc2pdf_tool/
 │   └── scanner.py     # 文件夹扫描器
 ├── converters/
 │   └── doc2pdf.py    # PDF转换器
-├── venv/              # Python虚拟环境
-├── requirements.txt    # 依赖列表
-└── start.bat          # 一键启动脚本
+├── venv/              # Python虚拟环境（含所有依赖）
+├── static/            # 静态文件
+├── templates/         # 模板文件
+├── output/            # PDF输出目录
+├── .gitignore
+├── 64x64.ico          # 应用图标
+├── README.md          # 本文档
+├── requirements.txt   # 依赖列表
+├── start.bat          # 开发者启动脚本
+└── 双击启动 文档转PDF.bat  # 一键启动脚本（双击此文件）
 ```
 
 ## 技术栈
