@@ -577,16 +577,16 @@ if __name__ == "__main__":
     import socket
     
     print("=" * 50)
-    print("Doc2PDF Tool - Document to PDF Converter")
+    print("   文档转PDF工具")
     print("=" * 50)
     
-    print("\n[1/4] Checking port 8503...")
+    print("\n[1/4] 检查端口 8503...")
     def check_and_kill_port(port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex(('localhost', port))
         sock.close()
         if result == 0:
-            print(f"    Port occupied, killing old process...")
+            print("    端口已被占用，正在清理旧进程...")
             try:
                 import subprocess
                 result = subprocess.run(f'netstat -ano | findstr :{port}', capture_output=True, text=True, shell=True)
@@ -598,16 +598,16 @@ if __name__ == "__main__":
                             if p.isdigit() and i > 0 and parts[i-1] == 'LISTENING':
                                 pid = int(p)
                                 subprocess.run(f'taskkill /PID {pid} /F', capture_output=True, shell=True)
-                                print(f"    Killed process PID: {pid}")
+                                print(f"    已结束旧进程 PID: {pid}")
                                 break
             except Exception as e:
-                print(f"    Cleanup failed: {e}")
+                print(f"    清理失败: {e}")
         else:
-            print("    Port is free")
+            print("    端口空闲")
     
     check_and_kill_port(8503)
     
-    print("\n[2/4] Starting server...")
+    print("\n[2/4] 启动服务...")
     import uvicorn
     import logging
     import logging.config
@@ -630,29 +630,29 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
     
-    print("    Server starting...")
+    print("    服务启动中...")
     
-    print("\n[3/4] Waiting for server...")
+    print("\n[3/4] 等待服务就绪...")
     for i in range(20):
         time.sleep(0.3)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex(('localhost', 8503))
         sock.close()
         if result == 0:
-            print("    [OK] Server ready!")
+            print("    [OK] 服务已就绪!")
             break
     else:
-        print("    [FAIL] Server failed to start!")
+        print("    [FAIL] 服务启动失败!")
         sys.exit(1)
     
-    print("\n[4/4] Opening browser...")
+    print("\n[4/4] 打开浏览器...")
     time.sleep(0.5)
     webbrowser.open('http://localhost:8503')
-    print("    Browser opened!")
+    print("    浏览器已打开!")
     
     print("\n" + "=" * 50)
-    print("Server started! Visit http://localhost:8503")
-    print("To exit: click [Exit] button in web interface")
+    print("服务已启动，请访问 http://localhost:8503")
+    print("关闭浏览器后，点网页上的[退出]按钮终止程序")
     print("=" * 50)
     
     def hide_console():
