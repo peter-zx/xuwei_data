@@ -1,0 +1,5 @@
+2026-04-10 18:02:57 | INFO     | startup | Starting server on http://0.0.0.0:8503
+2026-04-10 18:02:57 | INFO     | startup | Starting Doc2PDF v3.0
+2026-04-10 18:02:57 | INFO     | startup | Environment: development
+2026-04-10 18:02:57 | INFO     | startup | Upload dir: C:\Users\Administrator\Desktop\Doc2PDF\data\storage\uploads
+2026-04-10 18:02:57 | INFO     | startup | Output dir: C:\Users\Administrator\Desktop\Doc2PDF\data\storage\outputs

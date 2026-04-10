@@ -5,27 +5,26 @@ echo    Doc2PDF Tool Starting...
 echo ========================================
 echo.
 
-cd /d "%~dp0"
+set "PROJECT_DIR=%~dp0"
+set "VENV_PYTHON=%PROJECT_DIR%venv\Scripts\python.exe"
+set "MAIN_PY=%PROJECT_DIR%app\main.py"
 
-if not exist "venv" (
-    echo First run, creating virtual environment...
-    python -m venv venv
-    call venv\Scripts\activate.bat
-    echo.
-    echo Installing dependencies...
-    pip install -r requirements.txt
-    echo.
-    echo Done!
-) else (
-    call venv\Scripts\activate.bat
+if not exist "%VENV_PYTHON%" (
+    echo Error: Python virtual environment not found
+    echo Please run: python -m venv venv
+    pause
+    exit /b 1
 )
 
-echo.
-echo Starting service...
-echo Browser will open http://localhost:8503
-echo To exit: click [Exit] button in web interface
+if not exist "%MAIN_PY%" (
+    echo Error: app/main.py not found
+    pause
+    exit /b 1
+)
+
+echo Starting server on http://localhost:8503
 echo.
 
-python backend\main.py
+cmd /c "title Doc2PDF Server && cd /d "%PROJECT_DIR%" && venv\Scripts\python app\main.py"
 
 pause
