@@ -88,7 +88,7 @@ class FileScanner:
         html += '</div>'
         return html
     
-    def _render_tree(self, node: FileNode, level: int, parent_names: list = None) -> str:
+    def _render_tree(self, node: FileNode, level: int, parent_names: list = None, folder_id: int = 0) -> str:
         if parent_names is None:
             parent_names = []
         
@@ -100,24 +100,28 @@ class FileScanner:
             
             has_visible_content = False
             content_html = ""
+            child_folder_id = folder_id + 1
             
             for child in node.children:
                 if child.is_folder:
-                    child_html = self._render_tree(child, level + 1, current_parents)
+                    child_html = self._render_tree(child, level + 1, current_parents, child_folder_id)
                     if child_html:
                         content_html += child_html
                         has_visible_content = True
+                        child_folder_id += self._count_folders(child)
                 else:
                     content_html += self._render_file(child, current_parents_str)
                     has_visible_content = True
             
             if has_visible_content:
-                folder_html = f'<div class="folder-header" style="padding:10px 12px; background:#e8e8f0; border-radius:8px; margin-bottom:8px; margin-top:8px; display:flex; align-items:center; gap:10px;">'
-                folder_html += f'<input type="checkbox" class="folder-checkbox" data-folders="{current_parents_str}" style="width:18px; height:18px; cursor:pointer;">'
-                folder_html += f'<span style="font-weight:600; color:#374151;">📁 {node.name}</span>'
+                folder_id_str = f"folder_{folder_id}"
+                folder_html = f'<div class="folder-header" style="padding:10px 12px; background:#e8e8f0; border-radius:8px; margin-bottom:8px; margin-top:8px; display:flex; align-items:center; gap:10px; cursor:pointer;" onclick="toggleFolder(\'{folder_id_str}\')">'
+                folder_html += f'<input type="checkbox" class="folder-checkbox" data-folders="{current_parents_str}" onclick="event.stopPropagation();" style="width:18px; height:18px; cursor:pointer;">'
+                folder_html += f'<span id="{folder_id_str}_icon" style="font-weight:600; color:#374151;">📁 {node.name}</span>'
                 folder_html += f'<span style="color:#9ca3af; font-size:0.85rem;">({self._count_files(node)} 个文件)</span>'
+                folder_html += f'<span style="margin-left:auto; color:#9ca3af; font-size:0.75rem;">点击折叠</span>'
                 folder_html += f'</div>'
-                html = folder_html + f'<div style="padding-left:{level * 20}px;">{content_html}</div>'
+                html = folder_html + f'<div id="{folder_id_str}_content" style="padding-left:{level * 20}px;">{content_html}</div>'
         
         return html
     
@@ -155,6 +159,14 @@ class FileScanner:
                 return f"{size:.1f} {unit}"
             size /= 1024
         return f"{size:.1f} TB"
+
+    def _count_folders(self, node: FileNode) -> int:
+        if not node.is_folder:
+            return 0
+        count = 1
+        for child in node.children:
+            count += self._count_folders(child)
+        return count
 
 
 def count_files(node: FileNode) -> int:

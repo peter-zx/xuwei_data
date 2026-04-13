@@ -465,6 +465,18 @@ def get_default_html():
             resultsDiv.innerHTML = html;
         }
         
+        function toggleFolder(folderId) {
+            const content = document.getElementById(folderId + '_content');
+            const icon = document.getElementById(folderId + '_icon');
+            if (content.style.display === 'none') {
+                content.style.display = 'block';
+                icon.textContent = '📁 ' + icon.textContent.replace('📂 ', '');
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '📂 ' + icon.textContent.replace('📁 ', '');
+            }
+        }
+        
         async function exitApp() {
             if (!confirm('确定要退出吗？')) return;
             try {
