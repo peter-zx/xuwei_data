@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"正在启动 {settings.APP_NAME} v{settings.VERSION}")
     logger.info(f"运行环境: {settings.ENV}")
     logger.info(f"上传目录: {settings.paths.UPLOAD_DIR}")
-    logger.info(f"输出目录: {settings.paths.OUTPUT_DIR}")
+    logger.info(f"输出目录: {Path.home() / 'Desktop' / 'Output_时间戳'}")
     
     yield
     
@@ -77,70 +77,119 @@ def get_default_html():
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 16px; margin-bottom: 20px; text-align: center; }
         .header h1 { font-size: 2rem; margin-bottom: 10px; }
         .card { background: white; border-radius: 16px; padding: 24px; margin-bottom: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-        .drop-zone { width: 100%; min-height: 150px; border: 3px dashed #d1d5db; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: #fafafa; margin-bottom: 16px; }
+        .section-title { font-size: 1.1rem; font-weight: 600; color: #374151; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .drop-zone { width: 100%; min-height: 120px; border: 3px dashed #d1d5db; border-radius: 16px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; background: #fafafa; margin-bottom: 16px; }
         .drop-zone:hover { border-color: #667eea; background: #f5f5ff; }
         .drop-zone.dragover { border-color: #667eea; background: #f0f0ff; }
         .drop-zone-content { text-align: center; }
-        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn { padding: 12px 24px; border: none; border-radius: 10px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
         .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
         .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
         .btn-success { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
-        .btn-success:hover { transform: translateY(-2px); }
-        .file-list { list-style: none; max-height: 300px; overflow-y: auto; }
-        .file-item { padding: 12px; border-radius: 8px; margin-bottom: 8px; background: #f9fafb; display: flex; align-items: center; gap: 12px; }
-        .file-item input[type="checkbox"] { width: 18px; height: 18px; }
-        .file-name { flex: 1; }
-        .file-size { color: #9ca3af; font-size: 0.85rem; }
-        .progress-bar { height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; margin-top: 16px; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s; }
-        .result-item { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; }
-        .result-success { background: #d1fae5; color: #10b981; }
-        .result-failed { background: #fee2e2; color: #ef4444; }
-        .stats { display: flex; gap: 16px; margin-top: 16px; }
-        .stat { flex: 1; text-align: center; padding: 16px; background: #f3f4f6; border-radius: 10px; }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(17, 153, 142, 0.4); }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-secondary:hover { background: #5b6270; }
+        .input-group { display: flex; gap: 12px; margin-bottom: 16px; align-items: center; }
+        .input-group input { flex: 1; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 10px; font-size: 0.95rem; }
+        .input-group input:focus { border-color: #667eea; outline: none; }
+        .file-tree { background: #f9fafb; border-radius: 12px; padding: 16px; max-height: 400px; overflow-y: auto; }
+        .file-list { list-style: none; }
+        .file-list li { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+        .file-list li:hover { background: #e5e7eb; }
+        .file-list li.folder { font-weight: 600; color: #374151; margin-bottom: 8px; }
+        .file-info { flex: 1; display: flex; justify-content: space-between; align-items: center; min-width: 0; }
+        .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .file-size { color: #9ca3af; font-size: 0.85rem; margin-left: 12px; flex-shrink: 0; }
+        .stats { display: flex; gap: 16px; margin-top: 16px; padding: 16px; background: #f3f4f6; border-radius: 12px; }
+        .stat { flex: 1; text-align: center; padding: 12px; background: white; border-radius: 10px; }
         .stat-value { font-size: 1.5rem; font-weight: 700; color: #667eea; }
         .stat-label { font-size: 0.8rem; color: #6b7280; margin-top: 4px; }
+        .progress-bar { height: 10px; background: #e5e7eb; border-radius: 5px; overflow: hidden; margin-top: 16px; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #667eea 0%, #764ba2 100%); transition: width 0.3s; }
+        .result-item { padding: 12px 16px; border-radius: 10px; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; }
+        .result-success { background: #d1fae5; color: #10b981; }
+        .result-failed { background: #fee2e2; color: #ef4444; }
         .hidden { display: none; }
+        .hint { font-size: 0.85rem; color: #9ca3af; margin-top: 8px; }
+        .log-container { background: #1e1e1e; border-radius: 8px; padding: 16px; max-height: 300px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 0.85rem; color: #fff; }
+        .log-line { padding: 4px 0; border-bottom: 1px solid #333; }
+        .log-line:last-child { border-bottom: none; }
+        .log-success { color: #4caf50; }
+        .log-error { color: #f44336; }
+        .log-info { color: #2196f3; }
+        .tab-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+        .tab-btn { padding: 10px 20px; border: none; border-radius: 8px; background: #e5e7eb; color: #6b7280; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>文档转PDF工具</h1>
-            <p>支持 Word/Excel/PPT/TXT 转换为 PDF</p>
-        </div>
-        
-        <div class="card">
-            <h2 style="margin-bottom: 16px;">1. 上传文件</h2>
-            <div id="dropZone" class="drop-zone">
-                <div class="drop-zone-content">
-                    <div style="font-size: 3rem; margin-bottom: 10px;">📁</div>
-                    <div style="font-size: 1.1rem; font-weight: 600;">拖拽文件到此处或点击上传</div>
-                    <div style="font-size: 0.9rem; color: #9ca3af; margin-top: 8px;">支持格式: DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, PDF</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="text-align: left;">
+                    <h1>文档转PDF</h1>
+                    <p>支持 Word/Excel/PPT/TXT 转换为 PDF</p>
                 </div>
-                <input type="file" id="fileInput" multiple accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.pdf" style="display: none;">
-            </div>
-            
-            <div id="fileList" class="file-list hidden"></div>
-            
-            <div id="stats" class="stats hidden">
-                <div class="stat">
-                    <div class="stat-value" id="totalFiles">0</div>
-                    <div class="stat-label">文件数</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value" id="totalSize">0</div>
-                    <div class="stat-label">总大小</div>
-                </div>
+                <button class="btn btn-secondary" onclick="exitApp()">退出</button>
             </div>
         </div>
         
         <div class="card">
-            <h2 style="margin-bottom: 16px;">2. 开始转换</h2>
-            <button class="btn btn-success" id="convertBtn" onclick="startConvert()" disabled>开始转换</button>
+            <div class="section-title">1. 选择源文件夹</div>
+            <div class="tab-bar">
+                <button class="tab-btn active" id="tabFolder" onclick="switchTab('folder')">📁 文件夹</button>
+                <button class="tab-btn" id="tabUpload" onclick="switchTab('upload')">📤 上传文件</button>
+            </div>
             
-            <div id="progress" class="hidden" style="margin-top: 16px;">
-                <p id="progressText">转换中...</p>
+            <div id="folderTab">
+                <div id="dropZone" class="drop-zone" onclick="browseFolder()">
+                    <div class="drop-zone-content">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">📁</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: #374151;">点击选择文件夹</div>
+                        <div style="font-size: 0.9rem; color: #9ca3af; margin-top: 8px;">或拖拽文件夹到此处</div>
+                    </div>
+                </div>
+                <input type="text" id="folderPath" class="hidden" value="">
+                <div id="fileTree" class="file-tree hidden"></div>
+                <div id="stats" class="stats hidden">
+                    <div class="stat">
+                        <div class="stat-value" id="totalFiles">0</div>
+                        <div class="stat-label">文件数</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="totalSize">0</div>
+                        <div class="stat-label">总大小</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="selectedFiles">0</div>
+                        <div class="stat-label">已选择</div>
+                    </div>
+                </div>
+                <div class="hint" id="hint">点击上方区域选择文件夹</div>
+            </div>
+            
+            <div id="uploadTab" class="hidden">
+                <div id="uploadZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                    <div class="drop-zone-content">
+                        <div style="font-size: 3rem; margin-bottom: 10px;">📤</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; color: #374151;">拖拽文件到此处或点击上传</div>
+                        <div style="font-size: 0.9rem; color: #9ca3af; margin-top: 8px;">支持格式: DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, PDF</div>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.pdf" style="display: none;">
+                </div>
+                <div id="uploadFileList" class="file-list hidden" style="max-height: 250px; overflow-y: auto;"></div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="section-title">2. 输出设置</div>
+            <div class="input-group">
+                <input type="text" id="outputPath" placeholder="默认输出到桌面 Output_时间戳 文件夹" value="">
+                <button class="btn btn-secondary" onclick="browseOutput()">浏览</button>
+                <button class="btn btn-success" id="convertBtn" onclick="startConvert()" disabled>开始转换</button>
+            </div>
+            <div id="progress" class="hidden">
+                <p id="progressText" style="margin-bottom: 8px;">转换中...</p>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressBar" style="width: 0%"></div>
                 </div>
@@ -148,22 +197,124 @@ def get_default_html():
         </div>
         
         <div class="card hidden" id="resultsCard">
-            <h2 style="margin-bottom: 16px;">3. 转换结果</h2>
+            <div class="section-title">3. 转换结果</div>
             <div id="results"></div>
         </div>
     </div>
     
     <script>
-        let uploadedFiles = [];
+        let currentTab = 'folder';
         let selectedFiles = new Set();
+        let uploadedFiles = [];
+        let scannedFiles = [];
+        let isProcessing = false;
         
-        const dropZone = document.getElementById('dropZone');
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabFolder').classList.toggle('active', tab === 'folder');
+            document.getElementById('tabUpload').classList.toggle('active', tab === 'upload');
+            document.getElementById('folderTab').classList.toggle('hidden', tab !== 'folder');
+            document.getElementById('uploadTab').classList.toggle('hidden', tab !== 'upload');
+        }
+        
+        async function browseFolder() {
+            if (isProcessing) return;
+            try {
+                const response = await fetch('/api/browse-folder');
+                const data = await response.json();
+                if (data.path) {
+                    document.getElementById('folderPath').value = data.path;
+                    scanFolder();
+                }
+            } catch (e) {
+                alert('选择失败: ' + e.message);
+            }
+        }
+        
+        async function browseOutput() {
+            try {
+                const response = await fetch('/api/browse-output');
+                const data = await response.json();
+                if (data.path) {
+                    document.getElementById('outputPath').value = data.path;
+                }
+            } catch (e) {
+                alert('选择失败: ' + e.message);
+            }
+        }
+        
+        async function scanFolder() {
+            const folderPath = document.getElementById('folderPath').value.trim();
+            if (!folderPath) return;
+            
+            try {
+                const response = await fetch('/api/scan', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({folder_path: folderPath})
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('扫描失败: ' + data.error);
+                    return;
+                }
+                
+                scannedFiles = [];
+                selectedFiles.clear();
+                
+                document.getElementById('fileTree').innerHTML = data.tree_html;
+                document.getElementById('fileTree').classList.remove('hidden');
+                document.getElementById('stats').classList.remove('hidden');
+                document.getElementById('totalFiles').textContent = data.total_files;
+                document.getElementById('totalSize').textContent = data.total_size;
+                document.getElementById('hint').textContent = '点击文件复选框选择要转换的文件';
+                document.getElementById('convertBtn').disabled = true;
+                
+                initTreeCheckboxes();
+            } catch (e) {
+                alert('扫描失败: ' + e.message);
+            }
+        }
+        
+        function initTreeCheckboxes() {
+            document.addEventListener('change', function(e) {
+                if (e.target.classList.contains('folder-checkbox')) {
+                    const folderPath = e.target.dataset.folders;
+                    const isChecked = e.target.checked;
+                    
+                    document.querySelectorAll('.file-checkbox').forEach(cb => {
+                        const filePath = cb.dataset.folders;
+                        if (filePath === folderPath || filePath.startsWith(folderPath + '|')) {
+                            cb.checked = isChecked;
+                        }
+                    });
+                    updateSelection();
+                }
+                if (e.target.classList.contains('file-checkbox')) {
+                    updateSelection();
+                }
+            });
+        }
+        
+        function updateSelection() {
+            selectedFiles.clear();
+            document.querySelectorAll('.file-checkbox:checked').forEach(cb => {
+                if (cb.dataset.path) {
+                    selectedFiles.add(cb.dataset.path);
+                    scannedFiles.push({ path: cb.dataset.path, name: cb.closest('.file-row').querySelector('.file-name')?.textContent || '' });
+                }
+            });
+            document.getElementById('selectedFiles').textContent = selectedFiles.size;
+            document.getElementById('convertBtn').disabled = selectedFiles.size === 0;
+        }
+        
+        const uploadDropZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
         
-        dropZone.addEventListener('click', () => fileInput.click());
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
+        uploadDropZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadDropZone.classList.add('dragover'); });
+        uploadDropZone.addEventListener('dragleave', () => uploadDropZone.classList.remove('dragover'));
+        uploadDropZone.addEventListener('drop', (e) => { e.preventDefault(); uploadDropZone.classList.remove('dragover'); handleFiles(e.dataTransfer.files); });
         fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
         
         async function handleFiles(files) {
@@ -182,43 +333,37 @@ def get_default_html():
                         name: r.filename,
                         size: r.file_size
                     })));
-                    updateFileList();
+                    updateUploadFileList();
                 }
             } catch (e) {
                 console.error('上传失败:', e);
             }
         }
         
-        function updateFileList() {
-            const list = document.getElementById('fileList');
-            const stats = document.getElementById('stats');
+        function updateUploadFileList() {
+            const list = document.getElementById('uploadFileList');
             
             if (uploadedFiles.length === 0) {
                 list.classList.add('hidden');
-                stats.classList.add('hidden');
                 return;
             }
             
             list.classList.remove('hidden');
-            stats.classList.remove('hidden');
-            
-            list.innerHTML = uploadedFiles.map(f => `
-                <div class="file-item">
-                    <input type="checkbox" onchange="toggleFile('${f.id}')">
+            list.innerHTML = uploadedFiles.map((f, i) => `
+                <li style="background: #f9fafb;">
+                    <input type="checkbox" onchange="toggleUploadFile('${f.id}', this.checked)" style="width:18px; height:18px;">
                     <span class="file-name">${f.name}</span>
                     <span class="file-size">${formatSize(f.size)}</span>
-                </div>
+                </li>
             `).join('');
-            
-            document.getElementById('totalFiles').textContent = uploadedFiles.length;
-            document.getElementById('totalSize').textContent = formatSize(uploadedFiles.reduce((a, f) => a + f.size, 0));
-            
-            document.getElementById('convertBtn').disabled = selectedFiles.size === 0;
         }
         
-        function toggleFile(id) {
-            if (selectedFiles.has(id)) selectedFiles.delete(id);
-            else selectedFiles.add(id);
+        function toggleUploadFile(id, checked) {
+            if (checked) {
+                selectedFiles.add('upload:' + id);
+            } else {
+                selectedFiles.delete('upload:' + id);
+            }
             document.getElementById('convertBtn').disabled = selectedFiles.size === 0;
         }
         
@@ -231,36 +376,101 @@ def get_default_html():
         }
         
         async function startConvert() {
-            if (selectedFiles.size === 0) return;
+            if (selectedFiles.size === 0) {
+                alert('请选择要转换的文件');
+                return;
+            }
             
+            const outputPath = document.getElementById('outputPath').value.trim();
             const convertBtn = document.getElementById('convertBtn');
             const progress = document.getElementById('progress');
             
             convertBtn.disabled = true;
             progress.classList.remove('hidden');
             
+            const fileIds = [];
+            const filePaths = [];
+            
+            selectedFiles.forEach(key => {
+                if (key.startsWith('upload:')) {
+                    fileIds.push(key.substring(7));
+                } else {
+                    filePaths.push(key);
+                }
+            });
+            
             try {
+                const folderPath = document.getElementById('folderPath').value;
+                const outputPath = document.getElementById('outputPath').value.trim();
+                const progress = document.getElementById('progress');
+                const progressBar = document.getElementById('progressBar');
+                
+                progress.classList.remove('hidden');
+                progressBar.style.width = '50%';
+                
                 const response = await fetch('/api/convert', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ file_ids: Array.from(selectedFiles), preserve_structure: true })
+                    body: JSON.stringify({
+                        file_ids: fileIds,
+                        file_paths: filePaths,
+                        preserve_structure: true,
+                        source_root: folderPath || null,
+                        output_dir: outputPath || null
+                    })
                 });
                 
-                const data = await response.json();
+                progressBar.style.width = '100%';
                 
-                if (data.success) {
-                    document.getElementById('resultsCard').classList.remove('hidden');
-                    document.getElementById('results').innerHTML = `
-                        <div class="result-item result-success">
-                            任务已创建: ${data.task_id}
-                        </div>
-                    `;
-                }
+                const data = await response.json();
+                showResults(data);
             } catch (e) {
-                console.error('转换失败:', e);
+                alert('转换失败: ' + e.message);
             } finally {
                 convertBtn.disabled = false;
+                setTimeout(() => {
+                    document.getElementById('progress').classList.add('hidden');
+                    document.getElementById('progressBar').style.width = '0%';
+                }, 1000);
             }
+        }
+        
+        function showResults(data) {
+            const resultsCard = document.getElementById('resultsCard');
+            const resultsDiv = document.getElementById('results');
+            
+            resultsCard.classList.remove('hidden');
+            
+            let html = '<div class="log-container">';
+            
+            const successCount = data.successful || 0;
+            const failedCount = data.failed || 0;
+            
+            html += '<div class="log-line ' + (failedCount === 0 ? 'log-success' : 'log-error') + '" style="font-size:1.1rem; font-weight:600; padding:12px; text-align:center;">[完成] 成功: ' + successCount + ', 失败: ' + failedCount + '</div>';
+            
+            if (data.results) {
+                data.results.forEach(r => {
+                    if (!r.success) {
+                        html += '<div class="log-line log-error">[' + (r.success ? '成功' : '失败') + '] ' + r.original_path + '</div>';
+                        if (r.error) {
+                            html += '<div class="log-line log-error" style="padding-left:20px;">原因: ' + r.error + '</div>';
+                        }
+                    } else {
+                        html += '<div class="log-line log-success">✓ ' + r.original_path.split(/[/\\\\]/).pop() + '</div>';
+                    }
+                });
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+        }
+        
+        async function exitApp() {
+            if (!confirm('确定要退出吗？')) return;
+            try {
+                await fetch('/api/shutdown', {method: 'POST'});
+            } catch (e) {}
+            setTimeout(() => { window.close(); }, 500);
         }
     </script>
 </body>

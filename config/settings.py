@@ -47,7 +47,7 @@ class SecurityConfig:
 class Settings:
     ENV: str = "development"
     DEBUG: bool = True
-    APP_NAME: str = "Doc2PDF"
+    APP_NAME: str = "文档转PDF工具"
     VERSION: str = "3.0"
     
     paths: PathConfig = field(default_factory=PathConfig)

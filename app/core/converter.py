@@ -4,13 +4,12 @@ import shutil
 import subprocess
 import platform
 from pathlib import Path
-from typing import List, Optional, Callable, Dict, Any
+from typing import List, Optional, Callable
 from datetime import datetime
 import time
 
 from config.settings import get_settings
 from app.core.logging import get_logger
-from app.core.exceptions import ConversionError, UnsupportedFormatError
 from app.models.schemas import ConversionResultData
 
 
@@ -43,17 +42,17 @@ class ConversionResult:
 
 
 class Doc2PdfConverter:
-    def __init__(self, output_dir: Optional[Path] = None):
+    def __init__(self, output_dir: str, source_root: str = None):
         self.settings = get_settings()
         self.logger = get_logger("converter")
-        self.output_dir = output_dir or self.settings.paths.OUTPUT_DIR
+        
+        if output_dir:
+            self.output_dir = Path(output_dir)
+        else:
+            self.output_dir = Path.home() / "Desktop" / f"Output_{datetime.now().strftime('%m%d_%H%M%S')}"
+        
         self.output_dir.mkdir(parents=True, exist_ok=True)
-    
-    def _generate_unique_output_path(self, original_path: Path, output_dir: Path) -> Path:
-        timestamp = datetime.now().strftime("%m%d_%H%M%S")
-        unique_id = uuid.uuid4().hex[:8]
-        output_name = f"{timestamp}_{unique_id}_{original_path.stem}.pdf"
-        return output_dir / output_name
+        self.source_root = Path(source_root) if source_root else None
     
     def convert(self, file_path: str, progress_callback: Optional[Callable] = None) -> ConversionResult:
         start_time = time.time()
@@ -63,7 +62,7 @@ class Doc2PdfConverter:
             return ConversionResult(
                 success=False,
                 original_path=file_path,
-                error=f"File not found: {file_path}"
+                error=f"文件不存在: {file_path}"
             )
         
         ext = path.suffix.lower()
@@ -72,11 +71,11 @@ class Doc2PdfConverter:
             return ConversionResult(
                 success=False,
                 original_path=file_path,
-                error=f"Unsupported format: {ext}"
+                error=f"不支持的格式: {ext}"
             )
         
         try:
-            output_path = self._generate_unique_output_path(path, self.output_dir)
+            output_path = self._get_output_path(path)
             
             if ext == '.pdf':
                 shutil.copy(file_path, output_path)
@@ -92,7 +91,7 @@ class Doc2PdfConverter:
             if ext in ['.docx']:
                 result = self._convert_word(file_path, output_path)
             elif ext == '.doc':
-                result = self._convert_doc_old(file_path, output_path)
+                result = self._convert_doc_with_com(file_path, output_path)
             elif ext in ['.xlsx', '.xls']:
                 result = self._convert_excel(file_path, output_path)
             elif ext in ['.pptx', '.ppt']:
@@ -103,7 +102,7 @@ class Doc2PdfConverter:
                 result = ConversionResult(
                     success=False,
                     original_path=file_path,
-                    error=f"Unsupported format: {ext}"
+                    error=f"不支持的格式: {ext}"
                 )
             
             if result.success:
@@ -116,61 +115,26 @@ class Doc2PdfConverter:
             return result
             
         except Exception as e:
-            self.logger.exception(f"Conversion failed: {file_path}")
+            self.logger.exception(f"转换失败: {file_path}")
             return ConversionResult(
                 success=False,
                 original_path=file_path,
                 error=str(e)
             )
     
-    def _convert_word(self, input_path: str, output_path: Path) -> ConversionResult:
-        try:
-            from docx import Document
-            from reportlab.lib.pagesizes import A4
-            from reportlab.lib.styles import getSampleStyleSheet
-            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table
-            from reportlab.lib.units import cm
-            
-            doc = Document(input_path)
-            
-            pdf_doc = SimpleDocTemplate(
-                str(output_path),
-                pagesize=A4,
-                leftMargin=2*cm,
-                rightMargin=2*cm,
-                topMargin=2*cm,
-                bottomMargin=2*cm
-            )
-            styles = getSampleStyleSheet()
-            story = []
-            
-            for para in doc.paragraphs:
-                text = para.text.strip()
-                if text:
-                    if para.style.name.startswith('Heading'):
-                        level = int(para.style.name[-1]) if para.style.name[-1].isdigit() else 1
-                        story.append(Paragraph(text, styles[f'Heading{level}']))
-                    else:
-                        story.append(Paragraph(text, styles['Normal']))
-                    story.append(Spacer(1, 6))
-            
-            for table in doc.tables:
-                table_data = []
-                for row in table.rows:
-                    row_data = [cell.text for cell in row.cells]
-                    table_data.append(row_data)
-                if table_data:
-                    t = Table(table_data)
-                    story.append(t)
-                    story.append(Spacer(1, 12))
-            
-            pdf_doc.build(story)
-            return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
-            
-        except Exception as e:
-            return ConversionResult(success=False, original_path=input_path, error=f"Word conversion failed: {str(e)}")
+    def _get_output_path(self, path: Path) -> Path:
+        if self.source_root:
+            source = Path(self.source_root)
+            rel_path = path.relative_to(source)
+            output_subdir = self.output_dir / source.name / rel_path.parent
+            output_subdir.mkdir(parents=True, exist_ok=True)
+            output_name = f"{path.stem}.pdf"
+            return output_subdir / output_name
+        else:
+            output_name = f"{path.stem}_{uuid.uuid4().hex[:8]}.pdf"
+            return self.output_dir / output_name
     
-    def _convert_doc_old(self, input_path: str, output_path: Path) -> ConversionResult:
+    def _convert_word(self, input_path: str, output_path: Path) -> ConversionResult:
         system = platform.system()
         
         if system == "Windows":
@@ -178,13 +142,16 @@ class Doc2PdfConverter:
             if result.success:
                 return result
         
+        return self._convert_with_libreoffice(input_path, output_path)
+    
+    def _convert_with_libreoffice(self, input_path: str, output_path: Path) -> ConversionResult:
         libreoffice_path = shutil.which('libreoffice') or shutil.which('soffice')
         
         if not libreoffice_path:
             return ConversionResult(
                 success=False,
                 original_path=input_path,
-                error=".doc not supported. Save as .docx to convert."
+                error="请安装LibreOffice进行转换"
             )
         
         try:
@@ -198,29 +165,40 @@ class Doc2PdfConverter:
                 input_path
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             generated_pdf = Path(input_dir) / f"{Path(input_path).stem}.pdf"
             if generated_pdf.exists():
-                generated_pdf.rename(output_path)
+                shutil.move(str(generated_pdf), str(output_path))
                 return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
             else:
-                return ConversionResult(success=False, original_path=input_path, error="LibreOffice conversion failed")
+                return ConversionResult(success=False, original_path=input_path, error="LibreOffice转换失败")
                 
         except subprocess.TimeoutExpired:
-            return ConversionResult(success=False, original_path=input_path, error="Conversion timeout")
+            return ConversionResult(success=False, original_path=input_path, error="转换超时")
         except Exception as e:
             return ConversionResult(success=False, original_path=input_path, error=str(e))
+    
+    def _convert_doc_with_com(self, input_path: str, output_path: Path) -> ConversionResult:
+        system = platform.system()
+        
+        if system == "Windows":
+            result = self._convert_with_wps(input_path, output_path)
+            if result.success:
+                return result
+        
+        return self._convert_with_libreoffice(input_path, output_path)
     
     def _convert_with_wps(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
             import pythoncom
             import win32com.client
             
-            pythoncom.CoInitialize()
-            
+            success = False
             for prog_id in ["WPS.Application", "KSO.Application", "Word.Application"]:
                 try:
+                    pythoncom.CoInitialize()
+                    
                     app = win32com.client.Dispatch(prog_id)
                     doc = app.Documents.Open(str(Path(input_path).absolute()), ReadOnly=True)
                     doc.SaveAs(str(output_path), FileFormat=17)
@@ -229,19 +207,23 @@ class Doc2PdfConverter:
                     pythoncom.CoUninitialize()
                     
                     if output_path.exists():
-                        return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
-                except:
+                        success = True
+                        break
+                except Exception as e:
+                    try:
+                        pythoncom.CoUninitialize()
+                    except:
+                        pass
                     continue
             
-            pythoncom.CoUninitialize()
+            if success:
+                return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
+            else:
+                return ConversionResult(success=False, original_path=input_path, error="WPS/Office转换失败")
             
         except Exception as e:
-            try:
-                pythoncom.CoUninitialize()
-            except:
-                pass
-        
-        return ConversionResult(success=False, original_path=input_path, error=".doc conversion failed. Install WPS or Office.")
+            self.logger.error(f"WPS conversion error: {e}")
+            return ConversionResult(success=False, original_path=input_path, error=f"WPS转换异常: {str(e)}")
     
     def _convert_excel(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
@@ -294,7 +276,7 @@ class Doc2PdfConverter:
             return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
             
         except Exception as e:
-            return ConversionResult(success=False, original_path=input_path, error=f"Excel conversion failed: {str(e)}")
+            return ConversionResult(success=False, original_path=input_path, error=f"Excel转换失败: {str(e)}")
     
     def _convert_ppt(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
@@ -332,7 +314,7 @@ class Doc2PdfConverter:
             return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
             
         except Exception as e:
-            return ConversionResult(success=False, original_path=input_path, error=f"PPT conversion failed: {str(e)}")
+            return ConversionResult(success=False, original_path=input_path, error=f"PPT转换失败: {str(e)}")
     
     def _convert_txt(self, input_path: str, output_path: Path) -> ConversionResult:
         try:
@@ -362,7 +344,7 @@ class Doc2PdfConverter:
             return ConversionResult(success=True, original_path=input_path, output_path=str(output_path))
             
         except Exception as e:
-            return ConversionResult(success=False, original_path=input_path, error=f"TXT conversion failed: {str(e)}")
+            return ConversionResult(success=False, original_path=input_path, error=f"TXT转换失败: {str(e)}")
     
     def convert_batch(
         self,
@@ -392,5 +374,5 @@ class Doc2PdfConverter:
         return results
 
 
-def get_converter(output_dir: Optional[Path] = None) -> Doc2PdfConverter:
-    return Doc2PdfConverter(output_dir)
+def get_converter(output_dir: Optional[str] = None, source_root: Optional[str] = None) -> Doc2PdfConverter:
+    return Doc2PdfConverter(output_dir, source_root)

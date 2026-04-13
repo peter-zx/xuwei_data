@@ -1,20 +1,33 @@
 import time
 from typing import List, Optional
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
+from pydantic import BaseModel
 
 from config.settings import get_settings
 from app.core import get_logger, ConversionError
+from app.core.scanner import FileScanner, count_files
 from app.core.converter import get_converter
 from app.services import get_file_service, get_task_service
 from app.models.schemas import (
     UploadResponse,
-    ConversionRequest,
     TaskResponse,
     TaskStatusResponse,
     HealthResponse,
 )
+
+
+class ScanRequest(BaseModel):
+    folder_path: str
+
+
+class ConvertRequest(BaseModel):
+    file_ids: List[str] = []
+    file_paths: List[str] = []
+    preserve_structure: bool = True
+    source_root: Optional[str] = None
+    output_dir: Optional[str] = None
 
 
 logger = get_logger("api")
@@ -39,6 +52,70 @@ async def health_check():
         environment=settings.ENV,
         uptime=time.time() - start_time
     )
+
+
+@router.get("/browse-folder")
+async def browse_folder():
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    
+    folder_path = filedialog.askdirectory(title="选择文件夹")
+    root.destroy()
+    
+    if folder_path:
+        return {"path": folder_path}
+    return {"path": ""}
+
+
+@router.post("/browse-output")
+async def browse_output():
+    import tkinter as tk
+    from tkinter import filedialog
+    
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes('-topmost', True)
+    
+    folder_path = filedialog.askdirectory(title="选择输出文件夹")
+    root.destroy()
+    
+    if folder_path:
+        return {"path": folder_path}
+    return {"path": ""}
+
+
+@router.post("/scan")
+async def scan_folder(request: ScanRequest):
+    try:
+        scanner = FileScanner(request.folder_path)
+        tree = scanner.scan()
+        
+        if not tree:
+            return JSONResponse({
+                "success": False,
+                "error": "文件夹不存在或无法访问"
+            })
+        
+        tree_html = scanner.get_file_tree_html(tree)
+        total = count_files(tree)
+        
+        return JSONResponse({
+            "success": True,
+            "tree_html": tree_html,
+            "total_files": total,
+            "total_size": _format_size(tree.size),
+            "root_name": tree.name
+        })
+    except Exception as e:
+        logger.exception(f"扫描失败: {request.folder_path}")
+        return JSONResponse({
+            "success": False,
+            "error": str(e)
+        })
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -122,15 +199,12 @@ async def delete_file(file_id: str):
         raise HTTPException(status_code=404, detail="文件不存在")
 
 
-@router.post("/convert", response_model=TaskResponse)
-async def convert_files(request: ConversionRequest, background_tasks: BackgroundTasks):
-    if not request.file_ids:
-        raise HTTPException(status_code=400, detail="未选择文件")
-    
+@router.post("/convert")
+async def convert_files(request: ConvertRequest):
     file_service = get_file_service()
-    task_service = get_task_service()
     
     file_paths = []
+    
     for file_id in request.file_ids:
         file_path = file_service.get_file_path(file_id)
         if file_path and file_path.exists():
@@ -138,28 +212,41 @@ async def convert_files(request: ConversionRequest, background_tasks: Background
         else:
             raise HTTPException(status_code=404, detail=f"文件不存在: {file_id}")
     
-    task = task_service.create_task(total_files=len(file_paths))
+    for path in request.file_paths:
+        if Path(path).exists():
+            file_paths.append(path)
+        else:
+            raise HTTPException(status_code=404, detail=f"文件不存在: {path}")
     
-    async def run_conversion():
-        converter = get_converter()
-        results = converter.convert_batch(file_paths)
-        
-        for result in results:
-            task_service.add_result(task.task_id, result.to_data())
-        
-        task_service.update_task_status(
-            task.task_id,
-            "completed" if any(r.success for r in results) else "failed"
-        )
+    if not file_paths:
+        raise HTTPException(status_code=400, detail="未选择文件")
     
-    background_tasks.add_task(run_conversion)
-    
-    return TaskResponse(
-        success=True,
-        task_id=task.task_id,
-        status=task.status,
-        message=f"转换任务已创建: {len(file_paths)} 个文件"
+    converter = get_converter(
+        output_dir=request.output_dir,
+        source_root=request.source_root
     )
+    results = converter.convert_batch(file_paths)
+    
+    successful = sum(1 for r in results if r.success)
+    failed = len(results) - successful
+    
+    return JSONResponse({
+        "success": True,
+        "total": len(results),
+        "successful": successful,
+        "failed": failed,
+        "results": [
+            {
+                "success": r.success,
+                "original_path": r.original_path,
+                "output_path": r.output_path,
+                "error": r.error,
+                "file_size": r.file_size,
+                "processing_time": r.processing_time
+            }
+            for r in results
+        ]
+    })
 
 
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
