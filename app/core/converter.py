@@ -193,11 +193,18 @@ class Doc2PdfConverter:
         try:
             import pythoncom
             import win32com.client
+        except ImportError:
+            return ConversionResult(success=False, original_path=input_path, error="WPS/Office仅Windows支持，云端请使用LibreOffice")
+        
+        try:
             
             success = False
             for prog_id in ["WPS.Application", "KSO.Application", "Word.Application"]:
                 try:
-                    pythoncom.CoInitialize()
+                    try:
+                        pythoncom.CoInitialize()
+                    except Exception:
+                        pass
                     
                     app = win32com.client.Dispatch(prog_id)
                     doc = app.Documents.Open(str(Path(input_path).absolute()), ReadOnly=True)

@@ -1,7 +1,7 @@
 import os
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 from dataclasses import dataclass, field
 
@@ -13,10 +13,15 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 class PathConfig:
     STORAGE_ROOT: Path = field(default_factory=lambda: PROJECT_ROOT / "storage")
     UPLOAD_DIR: Path = field(default_factory=lambda: PROJECT_ROOT / "storage" / "uploads")
-    OUTPUT_DIR: Path = field(default_factory=lambda: PROJECT_ROOT / "storage" / "outputs")
+    OUTPUT_DIR: Path = field(
+        default_factory=lambda: PROJECT_ROOT / "storage" / "outputs"
+    )
     LOG_DIR: Path = field(default_factory=lambda: PROJECT_ROOT / "logs")
     TEMPLATES_DIR: Path = field(default_factory=lambda: PROJECT_ROOT / "app" / "templates")
     STATIC_DIR: Path = field(default_factory=lambda: PROJECT_ROOT / "app" / "static")
+    ALLOWED_SCAN_ROOTS: List[str] = field(
+        default_factory=lambda: [str(PROJECT_ROOT / "storage")]
+    )
 
 
 @dataclass
@@ -25,6 +30,8 @@ class ServerConfig:
     PORT: int = 8503
     WORKERS: int = 1
     RELOAD: bool = False
+    # 客户端连接地址（填写服务器实际 IP/域名，客户端用此地址连接）
+    BASE_URL: str = "http://localhost:8503"
 
 
 @dataclass
@@ -78,6 +85,30 @@ class Settings:
         self.server.HOST = os.getenv("HOST", self.server.HOST)
         self.server.PORT = int(os.getenv("PORT", str(self.server.PORT)))
         self.server.RELOAD = os.getenv("RELOAD", str(self.server.RELOAD)).lower() == "true"
+        self.server.BASE_URL = os.getenv("BASE_URL", self.server.BASE_URL)
+        
+        # 全局便捷访问
+        self._server_url = self.server.BASE_URL
+        
+        # 应用额外环境变量覆盖
+        self._apply_env_overrides()
+    
+    @property
+    def SERVER_URL(self) -> str:
+        return self.server.BASE_URL
+
+    def _apply_env_overrides(self):
+        # 输出目录支持环境变量覆盖（云端必须配置）
+        output_dir_env = os.getenv("OUTPUT_DIR")
+        if output_dir_env:
+            self.paths.OUTPUT_DIR = Path(output_dir_env)
+        
+        # 允许扫描的目录列表（安全隔离）
+        scan_roots_env = os.getenv("ALLOWED_SCAN_ROOTS")
+        if scan_roots_env:
+            self.paths.ALLOWED_SCAN_ROOTS = [
+                p.strip() for p in scan_roots_env.split(",") if p.strip()
+            ]
 
 
 _settings: Optional[Settings] = None

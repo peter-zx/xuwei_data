@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 from config.settings import get_settings, PROJECT_ROOT
 from app.core import get_logger, register_exception_handlers
@@ -43,6 +44,15 @@ app = FastAPI(
 )
 
 register_exception_handlers(app)
+
+# CORS - 允许客户端跨域访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(router, prefix="/api")
 

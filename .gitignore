@@ -1,9 +1,32 @@
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
 output/
 *.db
+*.sqlite3
 .DS_Store
+Thumbs.db
 dist/
 build/
 *.spec
+.env
+.env.local
+
+# 日志（运行时生成）
+logs/
+
+# 上传/输出文件（运行时生成）
+storage/uploads/
+storage/outputs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# PyInstaller
+release/

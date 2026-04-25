@@ -28,6 +28,20 @@ class ConvertRequest(BaseModel):
     preserve_structure: bool = True
     source_root: Optional[str] = None
     output_dir: Optional[str] = None
+    # 新增：客户端模式（True = 转换由客户端完成）
+    client_mode: bool = False
+    client_id: Optional[str] = None
+
+
+class ClientRegisterRequest(BaseModel):
+    hostname: str
+    os_version: str
+
+
+class ClientTaskResultRequest(BaseModel):
+    task_id: str
+    client_id: str
+    results: List[dict]  # [{file_id, success, pdf_path, error, processing_time}]
 
 
 logger = get_logger("api")
@@ -56,8 +70,11 @@ async def health_check():
 
 @router.get("/browse-folder")
 async def browse_folder():
-    import tkinter as tk
-    from tkinter import filedialog
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError:
+        return JSONResponse({"success": False, "error": "云端环境不支持文件夹浏览，请使用上传功能"})
     
     root = tk.Tk()
     root.withdraw()
@@ -73,8 +90,11 @@ async def browse_folder():
 
 @router.post("/browse-output")
 async def browse_output():
-    import tkinter as tk
-    from tkinter import filedialog
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError:
+        return JSONResponse({"success": False, "error": "云端环境不支持文件夹浏览，请使用上传功能"})
     
     root = tk.Tk()
     root.withdraw()
@@ -303,8 +323,235 @@ async def list_tasks():
     })
 
 
+# ══════════════════════════════════════════════════════
+#  客户端调度接口（客户端模式）
+# ══════════════════════════════════════════════════════
+
+@router.post("/client/register")
+async def client_register(request: ClientRegisterRequest):
+    """
+    客户端启动时注册，获取 client_id
+    """
+    from app.services.client_dispatcher import get_dispatcher
+    
+    dispatcher = get_dispatcher()
+    client_id = dispatcher.register_client(
+        hostname=request.hostname,
+        os_version=request.os_version
+    )
+    
+    return JSONResponse({
+        "success": True,
+        "client_id": client_id,
+        "server_url": str(settings.SERVER_URL),
+        "heartbeat_interval": 30
+    })
+
+
+@router.post("/client/heartbeat")
+async def client_heartbeat(client_id: str):
+    """
+    客户端保活
+    """
+    from app.services.client_dispatcher import get_dispatcher
+    
+    dispatcher = get_dispatcher()
+    alive = dispatcher.refresh_client(client_id)
+    
+    if not alive:
+        return JSONResponse({"success": False, "error": "client not found"}, status_code=404)
+    
+    # 主动推送分配给该客户端的任务
+    task = dispatcher.pop_task_for_client(client_id)
+    
+    return JSONResponse({
+        "success": True,
+        "task": task,
+        "pending_count": dispatcher.get_pending_count()
+    })
+
+
+@router.post("/client/result")
+async def client_submit_result(request: ClientTaskResultRequest):
+    """
+    客户端完成转换后，提交结果
+    1. 上传 PDF 文件
+    2. 更新任务状态
+    """
+    from app.services.client_dispatcher import get_dispatcher
+    
+    file_service = get_file_service()
+    task_service = get_task_service()
+    
+    task = task_service.get_task(request.task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    dispatcher = get_dispatcher()
+    dispatcher.mark_client_available(request.client_id)
+    
+    # 处理每个转换结果
+    for res in request.results:
+        file_id = res.get("file_id", "")
+        success = res.get("success", False)
+        pdf_path = res.get("pdf_path", "")
+        error = res.get("error", "")
+        processing_time = res.get("processing_time", 0.0)
+        
+        if success and pdf_path:
+            # 上传 PDF 文件到服务器存储
+            try:
+                from app.models.schemas import ConversionResultData
+                
+                result_data = ConversionResultData(
+                    success=True,
+                    original_path=res.get("original_path", ""),
+                    output_path=pdf_path,
+                    file_size=Path(pdf_path).stat().st_size if Path(pdf_path).exists() else 0,
+                    processing_time=processing_time
+                )
+                task_service.add_result(request.task_id, result_data)
+            except Exception as e:
+                logger.error(f"Failed to save client result: {e}")
+        
+        # 记录失败
+        if not success:
+            from app.models.schemas import ConversionResultData
+            result_data = ConversionResultData(
+                success=False,
+                original_path=res.get("original_path", ""),
+                output_path="",
+                error=error,
+                processing_time=processing_time
+            )
+            task_service.add_result(request.task_id, result_data)
+    
+    # 检查是否全部完成
+    task = task_service.get_task(request.task_id)
+    if task:
+        if task.processed_files >= task.total_files:
+            from app.models.schemas import TaskStatus
+            task_service.update_task_status(
+                request.task_id,
+                TaskStatus.COMPLETED if task.failed < task.total_files else TaskStatus.FAILED
+            )
+    
+    return JSONResponse({
+        "success": True,
+        "task_id": request.task_id,
+        "processed": task.processed_files if task else 0
+    })
+
+
+@router.get("/client/list")
+async def list_clients():
+    """查看当前在线的客户端"""
+    from app.services.client_dispatcher import get_dispatcher
+    
+    dispatcher = get_dispatcher()
+    clients = dispatcher.list_clients()
+    
+    return JSONResponse({
+        "success": True,
+        "clients": [
+            {
+                "client_id": c.client_id,
+                "hostname": c.hostname,
+                "os_version": c.os_version,
+                "last_seen": c.last_seen.isoformat(),
+                "available": c.available,
+                "pending_tasks": c.pending_tasks
+            }
+            for c in clients
+        ]
+    })
+
+
+@router.post("/convert/client")
+async def convert_via_client(request: ConvertRequest):
+    """
+    客户端模式：创建任务，分配给在线客户端执行
+    流程：
+    1. 创建任务
+    2. 将任务分配给可用的客户端
+    3. 返回 task_id（前端轮询 task 状态）
+    """
+    if not request.client_mode:
+        raise HTTPException(status_code=400, detail="client_mode must be True")
+    
+    file_service = get_file_service()
+    task_service = get_task_service()
+    dispatcher = get_dispatcher()
+    
+    # 收集文件路径
+    file_paths = []
+    for file_id in request.file_ids:
+        fp = file_service.get_file_path(file_id)
+        if fp and fp.exists():
+            file_paths.append(str(fp))
+        else:
+            raise HTTPException(status_code=404, detail=f"文件不存在: {file_id}")
+    
+    for path in request.file_paths:
+        if Path(path).exists():
+            file_paths.append(path)
+        else:
+            raise HTTPException(status_code=404, detail=f"文件不存在: {path}")
+    
+    if not file_paths:
+        raise HTTPException(status_code=400, detail="未选择文件")
+    
+    # 创建任务
+    task = task_service.create_task(total_files=len(file_paths))
+    from app.models.schemas import TaskStatus
+    task_service.update_task_status(task.task_id, TaskStatus.PROCESSING)
+    
+    # 构建文件列表（带上 file_id，方便客户端识别）
+    files_info = []
+    for i, fp in enumerate(file_paths):
+        file_id = request.file_ids[i] if i < len(request.file_ids) else f"_path_{i}"
+        files_info.append({
+            "id": file_id,
+            "path": fp,
+            "name": Path(fp).name
+        })
+    
+    # 查找可用客户端
+    available_client = dispatcher.find_available_client()
+    if not available_client:
+        # 没有客户端在线，创建空任务等待
+        task_service.update_task_status(
+            task.task_id,
+            TaskStatus.FAILED,
+            "没有在线的客户端，请确保 Doc2PDF 客户端已启动"
+        )
+        return JSONResponse({
+            "success": False,
+            "error": "没有在线的客户端，请确保 Doc2PDF 客户端已启动",
+            "task_id": task.task_id
+        }, status_code=503)
+    
+    # 分配任务给客户端
+    dispatcher.assign_task(
+        client_id=available_client.client_id,
+        task_id=task.task_id,
+        files=files_info,
+        output_dir=request.output_dir or str(settings.paths.OUTPUT_DIR),
+        source_root=request.source_root or ""
+    )
+    
+    logger.info(f"Task {task.task_id} assigned to client {available_client.hostname}")
+    
+    return JSONResponse({
+        "success": True,
+        "task_id": task.task_id,
+        "client_hostname": available_client.hostname,
+        "client_id": available_client.client_id,
+        "message": f"任务已分配给 {available_client.hostname}，正在转换..."
+    })
+
+
 @router.get("/download/{filename}")
-async def download_file(filename: str):
     output_dir = settings.paths.OUTPUT_DIR
     file_path = output_dir / filename
     
